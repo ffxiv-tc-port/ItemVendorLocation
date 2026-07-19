@@ -1,9 +1,9 @@
-author: electr0sheep, Nuko
+author: electr0sheep, Nuko, Lother
 name: Item Vendor Location
 punchline: Shows you where to buy vendor items
 description: Adds a context menu option for items that will show you where to find items you can buy off a vendor
-repo_url: https://github.com/electr0sheep/ItemVendorLocation
-icon_url: https://raw.githubusercontent.com/electr0sheep/ItemVendorLocation/main/Images/icon.png
+repo_url: https://github.com/Lother/ItemVendorLocation
+icon_url: https://raw.githubusercontent.com/Lother/DalamudPluginsTC/main/icons/ItemVendorLocation.png
 image_urls: [
   https://raw.githubusercontent.com/electr0sheep/ItemVendorLocation/main/Images/ContextMenu.png
 ]
