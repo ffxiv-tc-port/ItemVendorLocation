@@ -1,7 +1,7 @@
 author: electr0sheep, Nuko, Lother
 name: Item Vendor Location
-punchline: Shows you where to buy vendor items
-description: Adds a context menu option for items that will show you where to find items you can buy off a vendor
+punchline: 顯示可購買該道具的商人所在位置
+description: 為道具新增右鍵選單選項，可查看該道具可在哪些商人處購買
 repo_url: https://github.com/Lother/ItemVendorLocation
 icon_url: https://raw.githubusercontent.com/Lother/DalamudPluginsTC/main/icons/ItemVendorLocation.png
 image_urls: [
