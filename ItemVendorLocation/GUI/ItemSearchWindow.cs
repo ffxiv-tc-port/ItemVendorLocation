@@ -13,7 +13,7 @@ public class ItemSearchWindow : Window
     private string searchName = "";
     private int selectedItem;
 
-    public ItemSearchWindow() : base("Item Vendor Search")
+    public ItemSearchWindow() : base("物品商人搜尋")
     {
         RespectCloseHotkey = true;
 
@@ -24,7 +24,7 @@ public class ItemSearchWindow : Window
     public override void Draw()
     {
         var filteredItems = Service.Plugin.ItemLookup.GetItems().Where(i => i.Value.Name.Contains(searchName, StringComparison.CurrentCultureIgnoreCase));
-        ImGui.Text("Search:");
+        ImGui.Text("搜尋：");
         ImGui.SameLine();
         _ = ImGui.InputText("##ItemNameSearchFilter", ref searchName, 60);
         if (ImGui.ListBox("##ItemSearchList", ref selectedItem, filteredItems.Select(i => i.Value.Name).ToArray(), filteredItems.ToArray().Length))

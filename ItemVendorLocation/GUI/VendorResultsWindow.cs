@@ -12,7 +12,7 @@ public class VendorResultsWindow : Window
 {
     private ItemInfo _itemToDisplay;
 
-    public VendorResultsWindow() : base("Item Vendor Location")
+    public VendorResultsWindow() : base("物品購買地點")
     {
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -41,7 +41,7 @@ public class VendorResultsWindow : Window
         {
             if (location.TerritoryType == 282)
             {
-                ImGui.Text("Player Housing");
+                ImGui.Text("玩家房屋");
             }
             else
             {
@@ -70,7 +70,7 @@ public class VendorResultsWindow : Window
                         ImGui.SetClipboardText($"{_itemToDisplay.Name} -> {npcInfo.Name}@{placeString}, costs {costStr}");
                         Service.NotificationManager.AddNotification(new()
                         {
-                            Content = "Copied vendor info to clipboard",
+                            Content = "已複製商人資訊到剪貼簿",
                             Title = "ItemVendorLocation",
                             Type = NotificationType.Success,
                         });
@@ -80,7 +80,7 @@ public class VendorResultsWindow : Window
         }
         else
         {
-            ImGui.Text("No location");
+            ImGui.Text("無地點資訊");
         }
 
         _ = ImGui.TableNextColumn();
@@ -106,8 +106,8 @@ public class VendorResultsWindow : Window
 
     public override void Draw()
     {
-        ImGui.Text($"{_itemToDisplay.Name} Vendor list:");
-        ImGuiComponents.HelpMarker("You can right-click the button to copy vendor info to clipboard");
+        ImGui.Text($"{_itemToDisplay.Name} 商人列表：");
+        ImGuiComponents.HelpMarker("您可以右鍵點擊按鈕以複製商人資訊到剪貼簿");
 
         var columnCount = 3;
 #if DEBUG
@@ -131,18 +131,18 @@ public class VendorResultsWindow : Window
 #if DEBUG
         ImGui.TableSetupColumn("NPC ID");
 #endif
-        ImGui.TableSetupColumn("NPC Name");
+        ImGui.TableSetupColumn("NPC名稱");
         if (Service.Configuration.ShowShopName && _itemToDisplay.HasShopNames())
         {
-            ImGui.TableSetupColumn("Shop Name");
+            ImGui.TableSetupColumn("商店名稱");
         }
 
-        ImGui.TableSetupColumn("Location");
-        ImGui.TableSetupColumn(_itemToDisplay.Type == ItemType.CollectableExchange ? "Exchange Rate" : "Cost");
+        ImGui.TableSetupColumn("地點");
+        ImGui.TableSetupColumn(_itemToDisplay.Type == ItemType.CollectableExchange ? "兌換比例" : "花費");
 
         if (_itemToDisplay.Type == ItemType.Achievement)
         {
-            ImGui.TableSetupColumn("Obtain Requirement");
+            ImGui.TableSetupColumn("取得條件");
         }
 
         ImGui.TableHeadersRow();
