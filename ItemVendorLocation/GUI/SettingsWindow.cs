@@ -1,6 +1,7 @@
 ﻿using Dalamud.Interface.Windowing;
 using System;
 using System.Numerics;
+using CheapLoc;
 using Dalamud.Interface.Components;
 using Lumina.Excel.Sheets;
 using System.Linq;
@@ -14,7 +15,7 @@ namespace ItemVendorLocation.GUI;
 
 public class SettingsWindow : Window
 {
-    public SettingsWindow() : base("物品購買地點設定")
+    public SettingsWindow() : base(Loc.Localize("SettingsWindowTitle", "Item Vendor Location Settings"))
     {
         RespectCloseHotkey = true;
 
@@ -37,85 +38,85 @@ public class SettingsWindow : Window
             Service.Plugin.ItemLookup.BuildDebugVendorInfo((uint)num);
         }
         ImGui.SameLine();
-        if (ImGui.Button("Build NPC location")) // DEBUG-only, not translated
+        if (ImGui.Button("Build NPC location"))
         {
             Service.Plugin.ItemLookup.BuildDebugNpcLocation((uint)num);
         }
 #endif
         var filterDuplicates = Service.Configuration.FilterDuplicates;
-        if (ImGui.Checkbox("篩選重複項目", ref filterDuplicates))
+        if (ImGui.Checkbox(Loc.Localize("FilterDuplicates", "Filter Duplicates"), ref filterDuplicates))
         {
             Service.Configuration.FilterDuplicates = filterDuplicates;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"勾選後，將依地點篩選重複的商人");
+        ImGuiComponents.HelpMarker(Loc.Localize("FilterDuplicatesHelp", @"If checked, will filter duplicate vendors by location"));
 
         var filterGCResults = Service.Configuration.FilterGCResults;
-        if (ImGui.Checkbox("篩選軍隊結果", ref filterGCResults))
+        if (ImGui.Checkbox(Loc.Localize("FilterGCResults", "Filter GC Results"), ref filterGCResults))
         {
             Service.Configuration.FilterGCResults = filterGCResults;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"勾選後，只顯示您所屬軍隊的商人");
+        ImGuiComponents.HelpMarker(Loc.Localize("FilterGCResultsHelp", @"If checked, will only show your own GC vendor"));
 
         var filterNPCsWithNoLocation = Service.Configuration.FilterNPCsWithNoLocation;
-        if (ImGui.Checkbox("篩選無地點的結果", ref filterNPCsWithNoLocation))
+        if (ImGui.Checkbox(Loc.Localize("FilterNoLocation", "Filter Results With No Location"), ref filterNPCsWithNoLocation))
         {
             Service.Configuration.FilterNPCsWithNoLocation = filterNPCsWithNoLocation;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"勾選後，只顯示有地點資訊的NPC");
+        ImGuiComponents.HelpMarker(Loc.Localize("FilterNoLocationHelp", @"If checked, will only show npcs with a location"));
 
         var showShopName = Service.Configuration.ShowShopName;
-        if (ImGui.Checkbox("顯示商店資訊", ref showShopName))
+        if (ImGui.Checkbox(Loc.Localize("ShowShopInfo", "Show Shop Info"), ref showShopName))
         {
             Service.Configuration.ShowShopName = showShopName;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"勾選後，將顯示商店名稱資訊，例如「購買魔法師裝備 - 購買裝備 (Lv. 20-29)」");
+        ImGuiComponents.HelpMarker(Loc.Localize("ShowShopInfoHelp", @"If checked, will show shop name info e.g. 'Purchase Disciple of Magic Gear - Purchase Gear (Lv. 20-29)'"));
 
         var highlightSelectedNpc = Service.Configuration.HighlightSelectedNpc;
-        if (ImGui.Checkbox("醒目提示所選NPC", ref highlightSelectedNpc))
+        if (ImGui.Checkbox(Loc.Localize("HighlightSelectedNpc", "Highlight selected npc"), ref highlightSelectedNpc))
         {
             Service.Configuration.HighlightSelectedNpc = highlightSelectedNpc;
             Service.Framework.Run(() => Service.HighlightObject.ToggleHighlight(highlightSelectedNpc));
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"勾選後，將在畫面上出現販售上次搜尋物品的NPC時進行醒目提示");
+        ImGuiComponents.HelpMarker(Loc.Localize("HighlightSelectedNpcHelp", @"If checked, will highlight npcs that sell last item searched for once they are visible on-screen"));
         ImGui.SameLine();
         var highlightColorNames = Enum.GetNames<ObjectHighlightColor>();
         var highlightColorValues = Enum.GetValues<ObjectHighlightColor>();
         var selectedHighlightColor = Array.IndexOf(highlightColorValues, Service.Configuration.HighlightColor);
         ImGui.SetNextItemWidth(150f);
-        if (ImGui.Combo("醒目提示顏色", ref selectedHighlightColor, highlightColorNames, highlightColorNames.Length))
+        if (ImGui.Combo(Loc.Localize("HighlightColor", "Highlight Color"), ref selectedHighlightColor, highlightColorNames, highlightColorNames.Length))
         {
             Service.Configuration.HighlightColor = (ObjectHighlightColor)selectedHighlightColor;
             Service.Configuration.Save();
         }
 
         var highlightMenuSelections = Service.Configuration.HighlightMenuSelections;
-        if (ImGui.Checkbox("醒目提示選單項目", ref highlightMenuSelections))
+        if (ImGui.Checkbox(Loc.Localize("HighlightMenuSelections", "Highlight menu selections"), ref highlightMenuSelections))
         {
             Service.Configuration.HighlightMenuSelections = highlightMenuSelections;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"勾選後，將醒目提示選單項目以便更容易找到物品。
+        ImGuiComponents.HelpMarker(Loc.Localize("HighlightMenuSelectionsHelp", @"If checked, will highlight menu selections so items are easier to find.
 
-注意：如果您搜尋另一個由已開啟選單的商人所販售的物品，
-這將導致先前的物品與新的物品同時被醒目提示。這是可以修正的，但唯一的方法
-是每次都以原始顏色重新繪製所有未醒目提示的項目。醒目提示是每一
-影格都會執行的，而我不願意為這種我認為很蠢的情況多加一個每影格迴圈。");
+NOTE: If you search for another item that is sold by a vendor whose menu you already have open, this
+will cause both the previous item and the new item to be highlighted. I could fix this, but the only way I
+know how is to redraw every non-highlighted item with the original color. The highlighting occurs every
+frame, and I'm not willing to add another loop per frame for this use case which I think is stupid."));
         ImGui.SameLine();
         // this part seems dumb to me, but it works
         var selectedShopHighlightColor = Service.Configuration.ShopHighlightColor;
         ImGui.SetNextItemWidth(150f);
-        selectedShopHighlightColor = ImGuiComponents.ColorPickerWithPalette(1, "醒目提示顏色", selectedShopHighlightColor, ImGuiColorEditFlags.NoAlpha);
+        selectedShopHighlightColor = ImGuiComponents.ColorPickerWithPalette(1, Loc.Localize("HighlightColor", "Highlight Color"), selectedShopHighlightColor, ImGuiColorEditFlags.NoAlpha);
         if (selectedShopHighlightColor != Service.Configuration.ShopHighlightColor)
         {
             Service.Configuration.ShopHighlightColor = selectedShopHighlightColor;
@@ -124,7 +125,7 @@ public class SettingsWindow : Window
 
         ImGui.SetNextItemWidth(200f);
         int maxSearchResults = Service.Configuration.MaxSearchResults;
-        if (ImGui.InputInt("最大搜尋結果數", ref maxSearchResults))
+        if (ImGui.InputInt(Loc.Localize("MaxSearchResults", "Max Search Results"), ref maxSearchResults))
         {
             if (maxSearchResults is <= 50 and >= 1)
             {
@@ -133,31 +134,31 @@ public class SettingsWindow : Window
             }
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"使用文字指令時的最大搜尋結果數量，以避免聊天欄洗版。
+        ImGuiComponents.HelpMarker(Loc.Localize("MaxSearchResultsHelp", @"The max number of search results when using the text command to prevent chat spam.
 
-最大允許值為50。");
+Max allowable is 50."));
 
         var resultsViewTypeNames = Enum.GetNames<ResultsViewType>();
         var resultsViewTypeValues = Enum.GetValues<ResultsViewType>();
         var selectedResultsViewType = Array.IndexOf(resultsViewTypeValues, Service.Configuration.ResultsViewType);
         ImGui.SetNextItemWidth(200f);
-        if (ImGui.Combo("結果顯示方式", ref selectedResultsViewType, resultsViewTypeNames, resultsViewTypeNames.Length))
+        if (ImGui.Combo(Loc.Localize("ResultsViewType", "Results View Type"), ref selectedResultsViewType, resultsViewTypeNames, resultsViewTypeNames.Length))
         {
             Service.Configuration.ResultsViewType = resultsViewTypeValues[selectedResultsViewType];
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"插件如何顯示商人地點的搜尋結果。
+        ImGuiComponents.HelpMarker(Loc.Localize("ResultsViewTypeHelp", @"How the plugin displays vendor location results.
 
-「Single」將選取第一個結果並印在您的聊天欄中。
+Single will pick the first result and print it to your chat window.
 
-「Multiple」將以彈出視窗顯示結果。若保持此設定，插件將維持先前的運作方式不變。");
+Multiple will display the results in a popup window. If you leave it as this the plugin will function as it did before with no changes."));
 
         var uiColors = Service.DataManager.GetExcelSheet<UIColor>().DistinctBy(i => i.ClassicFF).ToList();
         int npcNameChatColor = Service.Configuration.NPCNameChatColor;
         ImGui.SetNextItemWidth(200f);
         // my lame way to allow selection of colors as defined in the UIColor sheet
-        if (ImGui.BeginCombo("NPC名稱文字顏色", ""))
+        if (ImGui.BeginCombo(Loc.Localize("NPCNameTextColor", "NPC Name Text Color"), ""))
         {
             foreach (var color in uiColors)
             {
@@ -183,7 +184,7 @@ public class SettingsWindow : Window
             ImGui.EndCombo();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"使用 /pvendor 搜尋時，NPC名稱的聊天文字顏色。");
+        ImGuiComponents.HelpMarker(Loc.Localize("NPCNameTextColorHelp", @"The chat text color of the NPC name when searching via /pvendor."));
 
         var keyNames = Service.KeyState.GetValidVirtualKeys().Select(i => i.GetFancyName()).ToArray();
         keyNames = [.. keyNames.Prepend("None")];
@@ -191,12 +192,12 @@ public class SettingsWindow : Window
         keyValues = [.. keyValues.Prepend(VirtualKey.NO_KEY)];
         var selectedKey = Array.IndexOf(keyValues, Service.Configuration.SearchDisplayModifier);
         ImGui.SetNextItemWidth(200f);
-        if (ImGui.Combo("結果顯示方式修飾鍵", ref selectedKey, keyNames, keyNames.Length))
+        if (ImGui.Combo(Loc.Localize("ResultsViewTypeModifier", "Results View Type Modifier"), ref selectedKey, keyNames, keyNames.Length))
         {
             Service.Configuration.SearchDisplayModifier = keyValues[selectedKey];
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"按住時將變更結果顯示方式。");
+        ImGuiComponents.HelpMarker(Loc.Localize("ResultsViewTypeModifierHelp", @"Changes the Results View Type when held."));
     }
 }

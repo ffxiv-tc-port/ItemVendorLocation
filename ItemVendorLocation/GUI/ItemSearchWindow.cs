@@ -1,4 +1,5 @@
-﻿using ImGuiNET;
+﻿using CheapLoc;
+using ImGuiNET;
 using Dalamud.Interface.Windowing;
 using System;
 using System.Collections.Generic;
@@ -13,7 +14,7 @@ public class ItemSearchWindow : Window
     private string searchName = "";
     private int selectedItem;
 
-    public ItemSearchWindow() : base("物品商人搜尋")
+    public ItemSearchWindow() : base(Loc.Localize("ItemSearchWindowTitle", "Item Vendor Search"))
     {
         RespectCloseHotkey = true;
 
@@ -24,7 +25,7 @@ public class ItemSearchWindow : Window
     public override void Draw()
     {
         var filteredItems = Service.Plugin.ItemLookup.GetItems().Where(i => i.Value.Name.Contains(searchName, StringComparison.CurrentCultureIgnoreCase));
-        ImGui.Text("搜尋：");
+        ImGui.Text(Loc.Localize("SearchLabel", "Search:"));
         ImGui.SameLine();
         _ = ImGui.InputText("##ItemNameSearchFilter", ref searchName, 60);
         if (ImGui.ListBox("##ItemSearchList", ref selectedItem, filteredItems.Select(i => i.Value.Name).ToArray(), filteredItems.ToArray().Length))

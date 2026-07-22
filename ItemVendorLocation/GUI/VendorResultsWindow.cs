@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using CheapLoc;
 using Dalamud.Interface.Windowing;
 using ItemVendorLocation.Models;
 using System.Numerics;
@@ -12,7 +13,7 @@ public class VendorResultsWindow : Window
 {
     private ItemInfo _itemToDisplay;
 
-    public VendorResultsWindow() : base("物品購買地點")
+    public VendorResultsWindow() : base(Loc.Localize("VendorResultsWindowTitle", "Item Vendor Location"))
     {
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -41,7 +42,7 @@ public class VendorResultsWindow : Window
         {
             if (location.TerritoryType == 282)
             {
-                ImGui.Text("玩家房屋");
+                ImGui.Text(Loc.Localize("PlayerHousing", "Player Housing"));
             }
             else
             {
@@ -67,10 +68,10 @@ public class VendorResultsWindow : Window
                 {
                     if (ImGui.IsMouseReleased(ImGuiMouseButton.Right))
                     {
-                        ImGui.SetClipboardText($"{_itemToDisplay.Name} -> {npcInfo.Name}@{placeString}, costs {costStr}");
+                        ImGui.SetClipboardText(string.Format(Loc.Localize("ClipboardFormat", "{0} -> {1}@{2}, costs {3}"), _itemToDisplay.Name, npcInfo.Name, placeString, costStr));
                         Service.NotificationManager.AddNotification(new()
                         {
-                            Content = "已複製商人資訊到剪貼簿",
+                            Content = Loc.Localize("CopiedToClipboard", "Copied vendor info to clipboard"),
                             Title = "ItemVendorLocation",
                             Type = NotificationType.Success,
                         });
@@ -80,7 +81,7 @@ public class VendorResultsWindow : Window
         }
         else
         {
-            ImGui.Text("無地點資訊");
+            ImGui.Text(Loc.Localize("NoLocation", "No location"));
         }
 
         _ = ImGui.TableNextColumn();
@@ -106,8 +107,8 @@ public class VendorResultsWindow : Window
 
     public override void Draw()
     {
-        ImGui.Text($"{_itemToDisplay.Name} 商人列表：");
-        ImGuiComponents.HelpMarker("您可以右鍵點擊按鈕以複製商人資訊到剪貼簿");
+        ImGui.Text($"{_itemToDisplay.Name} {Loc.Localize("VendorListLabel", "Vendor list:")}");
+        ImGuiComponents.HelpMarker(Loc.Localize("RightClickCopyHelp", "You can right-click the button to copy vendor info to clipboard"));
 
         var columnCount = 3;
 #if DEBUG
@@ -131,18 +132,18 @@ public class VendorResultsWindow : Window
 #if DEBUG
         ImGui.TableSetupColumn("NPC ID");
 #endif
-        ImGui.TableSetupColumn("NPC名稱");
+        ImGui.TableSetupColumn(Loc.Localize("ColumnNpcName", "NPC Name"));
         if (Service.Configuration.ShowShopName && _itemToDisplay.HasShopNames())
         {
-            ImGui.TableSetupColumn("商店名稱");
+            ImGui.TableSetupColumn(Loc.Localize("ColumnShopName", "Shop Name"));
         }
 
-        ImGui.TableSetupColumn("地點");
-        ImGui.TableSetupColumn(_itemToDisplay.Type == ItemType.CollectableExchange ? "兌換比例" : "花費");
+        ImGui.TableSetupColumn(Loc.Localize("ColumnLocation", "Location"));
+        ImGui.TableSetupColumn(_itemToDisplay.Type == ItemType.CollectableExchange ? Loc.Localize("ColumnExchangeRate", "Exchange Rate") : Loc.Localize("ColumnCost", "Cost"));
 
         if (_itemToDisplay.Type == ItemType.Achievement)
         {
-            ImGui.TableSetupColumn("取得條件");
+            ImGui.TableSetupColumn(Loc.Localize("ColumnObtainRequirement", "Obtain Requirement"));
         }
 
         ImGui.TableHeadersRow();
@@ -152,7 +153,7 @@ public class VendorResultsWindow : Window
             string costStr;
             if (_itemToDisplay.Type == ItemType.CollectableExchange)
             {
-                costStr = npcInfo.Costs.Aggregate("", (current, cost) => current + $"{cost.Item2} will yield {cost.Item1}\n");
+                costStr = npcInfo.Costs.Aggregate("", (current, cost) => current + string.Format(Loc.Localize("WillYield", "{0} will yield {1}"), cost.Item2, cost.Item1) + "\n");
             }
             else
             {
