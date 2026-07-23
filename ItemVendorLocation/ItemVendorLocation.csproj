@@ -1,7 +1,7 @@
-﻿<Project Sdk="Dalamud.NET.Sdk/12.0.2">
+﻿<Project Sdk="Dalamud.NET.Sdk/15.0.0">
 
 	<PropertyGroup>
-		<Authors>electr0sheep, Nuko, Lother</Authors>
+		<Authors>electr0sheep, Nuko</Authors>
 		<Description>Dalamud plugin for item vendors</Description>
 	</PropertyGroup>
 
