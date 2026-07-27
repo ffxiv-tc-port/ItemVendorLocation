@@ -73,7 +73,7 @@ public class ItemVendorLocationIpc : IDisposable
             if (npcInfo.Location != null)
             {
                 var location = npcInfo.Location;
-                vendors.Add((npcInfo.Id, location.TerritoryType, (location.MapX, location.MapX)));
+                vendors.Add((npcInfo.Id, location.TerritoryType, (location.MapX, location.MapY)));
             }
             else if(!filterNoLocation)
             {
