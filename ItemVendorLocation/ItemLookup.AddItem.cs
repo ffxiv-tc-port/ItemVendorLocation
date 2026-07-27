@@ -370,11 +370,11 @@ public partial class ItemLookup
                                   ItemType type,
                                   string achievementDesc = "", uint categoryId = 0)
     {
-        if (itemId == 0)
+        if (itemId == 0 || Dictionaries.KnownNonVendorNpcIds.Contains(npcId))
         {
             return;
         }
-        
+
         if (Service.ClientState.ClientLanguage != ClientLanguage.Japanese && shopName == "アイテムの購入")
             shopName = string.Empty;
 

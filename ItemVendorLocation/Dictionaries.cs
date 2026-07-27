@@ -8,6 +8,17 @@ using GrandCompany = FFXIVClientStructs.FFXIV.Client.UI.Agent.GrandCompany;
 namespace ItemVendorLocation;
 public static class Dictionaries
 {
+    // ENpcBase IDs that are generic service handlers (Lost Property Administrator 1006004-1006006,
+    // Reward Manager 1017613-1017615), not real vendors a player can visit to purchase an item.
+    // AddAchievementItem() and quest-reward parsing attribute some items to these as a stand-in
+    // "location", which is misleading when surfaced as a purchasable source - excluded here so
+    // those items report as having no known vendor instead.
+    public static readonly HashSet<uint> KnownNonVendorNpcIds = new()
+    {
+        1006004, 1006005, 1006006,
+        1017613, 1017614, 1017615,
+    };
+
     public static readonly Dictionary<uint, uint> Currencies = new()
         {
             { 1, 28 },
