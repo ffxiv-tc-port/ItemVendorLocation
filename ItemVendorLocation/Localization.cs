@@ -30,7 +30,9 @@ internal class Localization
                                                                                      }
                                                                                  }
                                                                                  """,
-                                   (ClientLanguage)4 => ChineseTraditionalJson,
+                                   // TC(台服)客戶端在 Dalamud 13.0.0.16 之後回報 ClientLanguage 7(TraditionalChinese),
+                                   // 舊版回報 4(ChineseSimplified)。用數值比較才能同時相容 CI 釘的 13.0.0.6(列舉沒有 7 這個名字)與執行期新版。
+                                   (ClientLanguage)4 or (ClientLanguage)5 or (ClientLanguage)7 => ChineseTraditionalJson,
                                    ClientLanguage.English or _ => /*lang=json,strict*/ """
                                                                                        {
                                                                                            "ContextMenuItem": {
@@ -43,7 +45,7 @@ internal class Localization
         Loc.Setup(localizationJson);
     }
 
-    // zh-TW (FFXIV TC client reports ClientLanguage 4)
+    // zh-TW(台服)。上面的語言判斷用數值涵蓋 4/5/7 三種中文客戶端值。
     private const string ChineseTraditionalJson = /*lang=json,strict*/ """
         {
             "ContextMenuItem": { "message": "商人位置" },
