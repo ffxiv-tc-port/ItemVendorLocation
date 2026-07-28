@@ -52,7 +52,7 @@ internal class HighlightMenus : IDisposable
         }
 
 
-        var shopAddon = (AtkUnitBase*)shopAddonPtr;
+        var shopAddon = (AtkUnitBase*)shopAddonPtr.Address;
 
         var itemList = (AtkComponentList*)shopAddon->GetComponentByNodeId(16);
 
@@ -112,7 +112,7 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        var selectIconStringAddon = (AtkUnitBase*)selectIconStringAddonPtr;
+        var selectIconStringAddon = (AtkUnitBase*)selectIconStringAddonPtr.Address;
 
         var componentList = selectIconStringAddon->GetComponentListById(3);
 
@@ -157,7 +157,7 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        var selectIconStringAddon = (AtkUnitBase*)selectIconStringAddonPtr;
+        var selectIconStringAddon = (AtkUnitBase*)selectIconStringAddonPtr.Address;
 
         var componentList = selectIconStringAddon->GetComponentListById(3);
 
@@ -202,7 +202,7 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        var inclusionShopAddon = (AtkUnitBase*)inclusionShopAddonPtr;
+        var inclusionShopAddon = (AtkUnitBase*)inclusionShopAddonPtr.Address;
 
         var category = (AtkComponentDropDownList*)inclusionShopAddon->GetComponentByNodeId(7);
         var subcategory = (AtkComponentDropDownList*)inclusionShopAddon->GetComponentByNodeId(9);
@@ -303,7 +303,7 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        var shopExchangeCurrencyAddon = (AtkUnitBase*)shopExchangeCurrencyAddonPtr;
+        var shopExchangeCurrencyAddon = (AtkUnitBase*)shopExchangeCurrencyAddonPtr.Address;
 
 
         // highlight tab
@@ -317,19 +317,19 @@ internal class HighlightMenus : IDisposable
             AtkResNode* weaponsTab = armorTab->PrevSiblingNode;
             if (othersTab != null && _itemInfo?.SpecialShopCategory == 4)
             {
-                othersTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->GetAsAtkTextNode()->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                othersTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
             }
             if (accessoriesTab != null && _itemInfo?.SpecialShopCategory == 3)
             {
-                accessoriesTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->GetAsAtkTextNode()->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                accessoriesTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
             }
             if (armorTab != null && _itemInfo?.SpecialShopCategory == 2)
             {
-                armorTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->GetAsAtkTextNode()->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                armorTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
             }
             if (weaponsTab != null && _itemInfo?.SpecialShopCategory == 1)
             {
-                weaponsTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->GetAsAtkTextNode()->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                weaponsTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
             }
         }
 
@@ -382,7 +382,7 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        var shopExchangeItemAddon = (AtkUnitBase*)shopExchangeItemAddonPtr;
+        var shopExchangeItemAddon = (AtkUnitBase*)shopExchangeItemAddonPtr.Address;
 
         var itemList = (AtkComponentTreeList*)shopExchangeItemAddon->GetComponentByNodeId(20);
 
@@ -423,7 +423,7 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        var collectablesShopAddon = (AtkUnitBase*)collectablesShopAddonPtr;
+        var collectablesShopAddon = (AtkUnitBase*)collectablesShopAddonPtr.Address;
 
         try
         {
