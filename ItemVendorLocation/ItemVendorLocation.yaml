@@ -1,5 +1,6 @@
 author: electr0sheep, Nuko
 name: Item Vendor Location
+dalamud_api_level: 13
 punchline: 顯示可購買該道具的商人所在位置
 description: 為道具新增右鍵選單選項，可查看該道具可在哪些商人處購買
 repo_url: https://github.com/ffxiv-tc-port/ItemVendorLocation
