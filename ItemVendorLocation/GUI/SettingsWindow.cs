@@ -23,6 +23,22 @@ public class SettingsWindow : Window
         Size = new Vector2(740, 200);
     }
 
+    // 調色盤是畫在彈出視窗裡的，所以呼叫端拿不到對應的 ImGui item，
+    // IsItemDeactivatedAfterEdit() 在這裡不適用。改成先記錄「顏色已變動」，
+    // 等使用者不再操作任何控制項時才真正寫檔。
+    private bool _shopHighlightColorDirty;
+
+    // 保底：若在放開滑鼠的同一畫格關窗（例如拖曳中按 Esc），Draw() 不會再跑，
+    // 上面那個延遲存檔就永遠不會觸發，設定會遺失。
+    public override void OnClose()
+    {
+        if (!_shopHighlightColorDirty)
+            return;
+
+        _shopHighlightColorDirty = false;
+        Service.Configuration.Save();
+    }
+
     public override void Draw()
     {
 #if DEBUG
@@ -119,7 +135,14 @@ frame, and I'm not willing to add another loop per frame for this use case which
         selectedShopHighlightColor = ImGuiComponents.ColorPickerWithPalette(1, Loc.Localize("HighlightColor", "Highlight Color"), selectedShopHighlightColor, ImGuiColorEditFlags.NoAlpha);
         if (selectedShopHighlightColor != Service.Configuration.ShopHighlightColor)
         {
+            // 拖曳色環時每畫格都是新的顏色值，在這裡直接 Save() 等於以幀率同步寫磁碟。
             Service.Configuration.ShopHighlightColor = selectedShopHighlightColor;
+            _shopHighlightColorDirty = true;
+        }
+
+        if (_shopHighlightColorDirty && !ImGui.IsAnyItemActive())
+        {
+            _shopHighlightColorDirty = false;
             Service.Configuration.Save();
         }
 
