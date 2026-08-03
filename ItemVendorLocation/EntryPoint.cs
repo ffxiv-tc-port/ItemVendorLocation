@@ -112,7 +112,10 @@ public class EntryPoint : IDalamudPlugin
 
         var textNode = componentNode->GetTextNodeById(2)->GetAsAtkTextNode();
         var text = textNode->NodeText;
-        if (text.ToString().Contains("Shop Selling Price"))
+        // 這個判斷是「本外掛已經附加過了嗎」的等冪守衛,不是在比對遊戲的文字——
+        // 附加內容由 Utilities.GetToolTipString 產生,開頭固定是 ShopSellingPriceLabel。
+        // 標籤在地化之後,守衛也必須換成同一個字串,否則每影格都會再附加一次。
+        if (text.ToString().Contains(Utilities.ShopSellingPriceLabel))
         {
             return;
         }

@@ -9,6 +9,7 @@ using Lumina.Excel.Sheets;
 using Lumina.Text.Expressions;
 using Lumina.Text.ReadOnly;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -83,9 +84,10 @@ internal class HighlightMenus : IDisposable
                 text->SetText(itemName);
                 return;
             }
-            else if (itemName.EndsWith("..."))
+            // 截斷符號在不同語系客戶端可能是三個半形句點或全形省略號,兩種都認。
+            else if (itemName.EndsWith("...") || itemName.EndsWith("…"))
             {
-                if (_itemInfo.Name.StartsWith(itemName.TrimEnd('.')))
+                if (_itemInfo.Name.StartsWith(itemName.TrimEnd('.', '…')))
                 {
                     bestMatchIndex = index;
                 }
@@ -425,48 +427,67 @@ internal class HighlightMenus : IDisposable
 
         var collectablesShopAddon = (AtkUnitBase*)collectablesShopAddonPtr.Address;
 
-        try
+        // 原本是 _npcInfo.First(n => n.ShopName.Contains("Oddly Specific Materials Exchange")),
+        // 而 ShopName 是以 client 語言即時讀出來的(見 ItemLookup.AddItem.AddCollectablesShop),
+        // 台服是繁中 → First() 丟 InvalidOperationException → 被原本的空 catch 吞掉,
+        // 兌換商店的職業分類高亮在台服完全不作用且完全靜默。
+        // 改成用遊戲自己的 ClassJob 表(語言由 client 決定)解析括號內的職業名,不再比對英文字面。
+        NpcInfo? shop = null;
+        uint nodeId = 0;
+        foreach (var candidate in _npcInfo)
         {
-            var shop = _npcInfo.First(n => n.ShopName.Contains("Oddly Specific Materials Exchange"));
-            var shopType = shop.ShopName.Split("\n")[1].Split("Oddly Specific Materials Exchange (")[1].Split(")")[0];
-            var index = Enum.GetValues<CollectablesShopIconIndex>()[Enum.GetNames<CollectablesShopIconIndex>().ToList().FindIndex(e => e == shopType)];
-            var itemCost = shop.Costs[0].Item2.Split(" min ")[0];
-
-            var radioButton = (AtkComponentRadioButton*)collectablesShopAddon->GetComponentByNodeId((uint)index);
-            radioButton->ButtonBGNode->Color = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-
-            var itemList = (AtkComponentTreeList*)collectablesShopAddon->GetComponentByNodeId(28);
-
-            if (itemList == null)
+            var resolved = ResolveCollectablesShopNodeId(candidate.ShopName);
+            if (resolved == null)
             {
-                return;
+                continue;
             }
-
-            foreach (var item in itemList->Items)
-            {
-                var listItemRenderer = item.Value->Renderer;
-                if (listItemRenderer == null)
-                {
-                    continue;
-                }
-                var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(4);
-                if (text == null)
-                {
-                    continue;
-                }
-                var itemName = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText().Split(" ")[0];
-                if (itemName == itemCost)
-                {
-                    text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-                    // strangely, it doesn't seem like the list gets its color updated until we set the text below
-                    text->SetText(((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText());
-                    return;
-                }
-            }
+            shop = candidate;
+            nodeId = resolved.Value;
+            break;
         }
-        catch (InvalidOperationException)
+
+        if (shop == null || shop.Costs == null || shop.Costs.Count == 0)
         {
             return;
+        }
+
+        // 這個字串是我們自己在 AddCollectablesShop 組出來的英文格式,不是遊戲顯示文字。
+        var itemCost = shop.Costs[0].Item2.Split(" min ")[0];
+
+        var radioButton = (AtkComponentRadioButton*)collectablesShopAddon->GetComponentByNodeId(nodeId);
+        if (radioButton == null || radioButton->ButtonBGNode == null)
+        {
+            return;
+        }
+        radioButton->ButtonBGNode->Color = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+
+        var itemList = (AtkComponentTreeList*)collectablesShopAddon->GetComponentByNodeId(28);
+
+        if (itemList == null)
+        {
+            return;
+        }
+
+        foreach (var item in itemList->Items)
+        {
+            var listItemRenderer = item.Value->Renderer;
+            if (listItemRenderer == null)
+            {
+                continue;
+            }
+            var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(4);
+            if (text == null)
+            {
+                continue;
+            }
+            var itemName = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText().Split(" ")[0];
+            if (itemName == itemCost)
+            {
+                text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                // strangely, it doesn't seem like the list gets its color updated until we set the text below
+                text->SetText(((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText());
+                return;
+            }
         }
 
         //var carpenterButton = (AtkComponentRadioButton*)collectablesShopAddon->GetComponentByNodeId(3);
@@ -520,6 +541,88 @@ internal class HighlightMenus : IDisposable
         //        text->SetText(SeString.Parse(text->GetText()).TextValue);
         //    }
         //}
+    }
+
+    /// <summary>
+    ///     CollectablesShop 收藏品交易視窗裡,每個職業的單選按鈕節點 ID。
+    ///     鍵是 ClassJob 的 RowId(木工師 8 ~ 漁師 18)。
+    /// </summary>
+    private static readonly Dictionary<uint, uint> CollectablesShopNodeIdByClassJob = new()
+    {
+        [8] = 3,   // 木工師 / Carpenter
+        [9] = 4,   // 鍛造師 / Blacksmith
+        [10] = 5,  // 甲冑師 / Armorer
+        [11] = 6,  // 金工師 / Goldsmith
+        [12] = 7,  // 皮革師 / Leatherworker
+        [13] = 8,  // 裁縫師 / Weaver
+        [14] = 9,  // 鍊金術師 / Alchemist
+        [15] = 10, // 烹調師 / Culinarian
+        [16] = 11, // 採掘師 / Miner
+        [17] = 12, // 園藝師 / Botanist
+        [18] = 13, // 漁師 / Fisher
+    };
+
+    /// <summary>
+    ///     從 <see cref="NpcInfo.ShopName" /> 的第二行解析出收藏品交易的職業分頁節點 ID。
+    /// </summary>
+    /// <remarks>
+    ///     ShopName 的格式是「{CollectablesShop.Name}\n{CollectablesShopItemGroup.Name}」,
+    ///     兩者都是以 client 語言讀出的遊戲顯示文字。第二行結尾會帶括號職業名,例如
+    ///     英文「Oddly Specific Materials Exchange (Carpenter)」、
+    ///     台服「交換最終改良用材料（木工師）」。因此只認括號內容,再用遊戲自己的
+    ///     ClassJob 表比對——語言由 client 決定,不需要任何寫死的語系字面。
+    ///     比不到時才退回上游原本的英文列舉名(Carpenter / Carpentry / ...)。
+    /// </remarks>
+    private static uint? ResolveCollectablesShopNodeId(string? shopName)
+    {
+        if (string.IsNullOrEmpty(shopName))
+        {
+            return null;
+        }
+
+        var lines = shopName.Split('\n');
+        var group = lines.Length > 1 ? lines[1] : lines[0];
+
+        var open = group.LastIndexOfAny(['(', '（']);
+        if (open < 0)
+        {
+            return null;
+        }
+
+        var close = group.IndexOfAny([')', '）'], open + 1);
+        var suffix = (close < 0 ? group[(open + 1)..] : group[(open + 1)..close]).Trim();
+        if (suffix.Length == 0)
+        {
+            return null;
+        }
+
+        var classJobs = Service.DataManager.GetExcelSheet<ClassJob>();
+        if (classJobs != null)
+        {
+            foreach (var (classJobRowId, nodeId) in CollectablesShopNodeIdByClassJob)
+            {
+                var row = classJobs.GetRowOrDefault(classJobRowId);
+                if (row == null)
+                {
+                    continue;
+                }
+                var name = row.Value.Name.ExtractText();
+                if (!string.IsNullOrEmpty(name) && string.Equals(name, suffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return nodeId;
+                }
+            }
+        }
+
+        // 後備:上游原本的英文列舉名。
+        var names = Enum.GetNames<CollectablesShopIconIndex>();
+        var index = Array.FindIndex(names, e => string.Equals(e, suffix, StringComparison.OrdinalIgnoreCase));
+        if (index >= 0)
+        {
+            return (uint)Enum.GetValues<CollectablesShopIconIndex>()[index];
+        }
+
+        return null;
     }
 
     public void SetNpcInfo(NpcInfo[] npcInfos)

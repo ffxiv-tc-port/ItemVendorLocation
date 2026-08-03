@@ -10,7 +10,9 @@ public enum ResultsViewType : byte
 
 public enum CollectablesShopIconIndex : uint
 {
-    Carpenter, Carpentry = 3,
+    // 注意:原本寫成「Carpenter, Carpentry = 3」——C# 會把沒有初始值的第一個成員定為 0,
+    // 於是 Carpenter = 0(不是 3),用「Carpenter」查到的節點 ID 是 0。明確寫死 3。
+    Carpenter = 3, Carpentry = 3,
     Blacksmith, Blacksmithing = 4,
     Armoer, Armoring = 5,
     Goldsmith, Goldsmithing = 6,

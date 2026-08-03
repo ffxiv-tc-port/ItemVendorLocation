@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using CheapLoc;
+using System.Collections.Generic;
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
 using FFXIVClientStructs.FFXIV.Client.Game;
@@ -308,20 +309,32 @@ internal class Utilities
         return results;
     }
     
+    /// <summary>
+    ///     幻影櫃(MiragePrismPrismItemDetail)附加文字用的「商店販售價格」標籤。
+    /// </summary>
+    /// <remarks>
+    ///     這個字串同時是附加內容的開頭,也是「本外掛已經附加過了嗎」的等冪守衛標記
+    ///     (見 EntryPoint.OnMiragePrismPrismItemDetailPreDraw,那是每影格 PreDraw)。
+    ///     兩邊必須共用同一個字串,否則翻譯之後每一影格都會再附加一次。
+    ///     繁中用語取自遊戲自己的 Addon 表第 1693 列「商店販售價格」。
+    /// </remarks>
+    internal static string ShopSellingPriceLabel =>
+        Loc.Localize("ShopSellingPrice", "Shop Selling Price");
+
     internal static unsafe SeString GetToolTipString(uint itemId)
     {
         var itemInfo = Service.Plugin.ItemLookup.GetItemInfo(Utilities.CorrectItemId(itemId));
 
         if (itemInfo == null)
         {
-            return "Shop Selling Price: None";
+            return $"{ShopSellingPriceLabel}: {Loc.Localize("NoVendor", "None")}";
         }
 
         switch (itemInfo.Type)
         {
             case ItemType.GilShop:
                 var costStr = itemInfo.NpcInfos[0].Costs[0].Item1.ToString();
-                return $"Shop Selling Price: {costStr}";
+                return $"{ShopSellingPriceLabel}: {costStr}";
             case ItemType.GcShop:
                 var npcInfos = itemInfo.NpcInfos;
                 var playerGC = UIState.Instance()->PlayerState.GrandCompany;
@@ -336,17 +349,17 @@ internal class Utilities
 
                 costStr = $"{info.Costs[0].Item2} x{info.Costs[0].Item1}";
 
-                return $"Shop Selling Price: {costStr}";
+                return $"{ShopSellingPriceLabel}: {costStr}";
             case ItemType.SpecialShop:
-                return "Shop Selling Price: Special Shop";
+                return $"{ShopSellingPriceLabel}: {Loc.Localize("SpecialVendor", "Special Vendor")}";
             case ItemType.FcShop:
                 info = itemInfo.NpcInfos.First();
-                costStr = $"FC Credits x{info.Costs[0].Item1}";
-                return $"Shop Selling Price: {costStr}";
+                costStr = $"{Loc.Localize("FcCredits", "FC Credits")} x{info.Costs[0].Item1}";
+                return $"{ShopSellingPriceLabel}: {costStr}";
             case ItemType.CollectableExchange:
-                return $"Shop Selling Price: Collectables Exchange Reward";
+                return $"{ShopSellingPriceLabel}: {Loc.Localize("CollectablesExchangeReward", "Collectables Exchange Reward")}";
             default:
-                return "Shop Selling Price: None";
+                return $"{ShopSellingPriceLabel}: {Loc.Localize("NoVendor", "None")}";
         }
 
     }

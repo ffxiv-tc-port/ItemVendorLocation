@@ -62,6 +62,8 @@ internal class Localization
             "SpecialVendor": { "message": "特殊商人" },
             "FcCredits": { "message": "公會戰績" },
             "CollectablesExchangeReward": { "message": "收藏品兌換獎勵" },
+            "ShopSellingPrice": { "message": "商店販售價格" },
+            "NoVendor": { "message": "無" },
             "SettingsWindowTitle": { "message": "物品購買地點設定" },
             "FilterDuplicates": { "message": "篩選重複項目" },
             "FilterDuplicatesHelp": { "message": "勾選後，將依地點篩選重複的商人" },
