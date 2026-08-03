@@ -110,78 +110,181 @@ internal class Utilities
         {
             case "RecipeNote":
             {
-                var recipeNoteAgent = Service.GameGui.FindAgentInterface(addonName);
-                // sig: 89 91 ? ? ? ? 48 8B D9 E8 ? ? ? ? 48 8B C8 48 8B F8 E8 ? ? ? ? 40 F6 C6 (offset is still the same in dt benchmark)
-                itemId = *(uint*)(recipeNoteAgent + 0x398);
+                // Was: *(uint*)(agent + 0x398). Replaced by the named CS field, which declares
+                // the exact same [FieldOffset(0x398)] -- equivalent, but now version-tracked by CS.
+                var agent = (AgentRecipeNote*)Service.GameGui.FindAgentInterface(addonName).Address;
+                if (agent == null)
+                {
+                    return results;
+                }
+
+                itemId = agent->ContextMenuResultItemId;
                 break;
             }
             case "RecipeTree" or "RecipeMaterialList":
             {
+                // Was: *(uint*)((nint)agent + 0x28). AgentRecipeItemContext.ResultItemId is
+                // declared at [FieldOffset(0x28)] -- equivalent.
                 var uiModule = (UIModule*)Service.GameGui.GetUIModule().Address;
+                if (uiModule == null)
+                {
+                    return results;
+                }
+
                 var agents = uiModule->GetAgentModule();
-                var agent = agents->GetAgentByInternalId(AgentId.RecipeItemContext);
-                // sig: 89 51 ? 48 8B D9 48 8B 49 ? 4D 8B F9 (offset is still the same in dt benchmark)
-                itemId = *(uint*)((nint)agent + 0x28);
+                if (agents == null)
+                {
+                    return results;
+                }
+
+                var agent = (AgentRecipeItemContext*)agents->GetAgentByInternalId(AgentId.RecipeItemContext);
+                if (agent == null)
+                {
+                    return results;
+                }
+
+                itemId = agent->ResultItemId;
                 break;
             }
             case "ColorantColoring":
             {
-                var colorantColoringAgent = Service.GameGui.FindAgentInterface(addonName);
+                // NO NAMED REPLACEMENT: FFXIVClientStructs' AgentColorant declares nothing at
+                // 0x3C (its first documented member is CharaView at 0x158), so this stays a raw
+                // hardcoded offset with no version guard. If the game shifts this field, we read
+                // a neighbouring dword and SILENTLY show the wrong vendor -- there is no error to
+                // observe. Re-verify against AgentColorant on every major patch.
+                var colorantColoringAgent = Service.GameGui.FindAgentInterface(addonName).Address;
+                if (colorantColoringAgent == 0)
+                {
+                    return results;
+                }
+
                 itemId = *(uint*)(colorantColoringAgent + 0x3C);
                 break;
             }
             case "GrandCompanyExchange":
             case "ShopExchangeItem":
             {
-                var agent = Service.GameGui.FindAgentInterface(addonName);
+                // NO NAMED REPLACEMENT: there is no AgentGrandCompanyExchange struct in
+                // FFXIVClientStructs at all, and AgentShop declares nothing at 0x54. Raw offset,
+                // no version guard -- same silent-drift failure mode as ColorantColoring above.
                 // base sig:
                 //     dt benchmark: 48 8D 4F ? C6 44 24 ? ? 41 83 CF
                 //     6.58: 48 8D 4E ? 44 0F B6 4D
                 // offset sig: 89 73 ?? 44 88 63 (offset is still the same in dt benchmark)
+                var agent = Service.GameGui.FindAgentInterface(addonName).Address;
+                if (agent == 0)
+                {
+                    return results;
+                }
+
                 itemId = *(uint*)(agent + 0x54);
                 break;
             }
             case "ChatLog":
             {
-                    var agent = (AgentChatLog*)Service.GameGui.FindAgentInterface(addonName).Address;
-                    // 6.58 sig: 89 83 ? ? ? ? E8 ? ? ? ? 66 89 83 ? ? ? ? 66 85 C0
-                    // DT benchmark sig: 41 89 86 ? ? ? ? E8 ? ? ? ? 66 41 89 86 ? ? ? ? 66 85 C0 (offset changes in dt benchmark)
-                    itemId = agent->ContextItemId;
-                    break;
+                var agent = (AgentChatLog*)Service.GameGui.FindAgentInterface(addonName).Address;
+                if (agent == null)
+                {
+                    return results;
+                }
+
+                itemId = agent->ContextItemId;
+                break;
             }
             case "ContentsInfoDetail":
             {
-                var agent = Service.GameGui.FindAgentInterface("ContentsInfo");
-                // sig: 8B 97 ? ? ? ? 48 8B C8 E8 ? ? ? ? E9 ? ? ? ? 48 83 FB ? 75 ? 8B 91 (offset is still the same in dt benchmark)
-                itemId = *(uint*)(agent + 0x17CC);
+                // Was: *(uint*)(agent + 0x17CC). AgentContentsTimer.ContextMenuItemId is declared
+                // at [FieldOffset(0x17CC)] -- equivalent. (The "ContentsInfo" addon is driven by
+                // Client::UI::Agent::AgentContentsTimer.)
+                var agent = (AgentContentsTimer*)Service.GameGui.FindAgentInterface("ContentsInfo").Address;
+                if (agent == null)
+                {
+                    return results;
+                }
+
+                itemId = agent->ContextMenuItemId;
                 break;
             }
             case "ItemSearch":
             {
-                itemId = CorrectItemId((uint)AgentContext.Instance()->UpdateCheckerParam);
+                var agent = AgentContext.Instance();
+                if (agent == null)
+                {
+                    return results;
+                }
+
+                itemId = CorrectItemId((uint)agent->UpdateCheckerParam);
                 break;
             }
             case "CharacterInspect":
             {
-                var container = InventoryManager.Instance()->GetInventoryContainer(InventoryType.Examine);
-                var agent = Service.GameGui.FindAgentInterface(addonName);
+                // BUGFIX: this used to read *(int*)(agent + 0x44C). AgentInspect grew in patch 7.3
+                // (0x808 -> 0x940) when _glamourItems was inserted, and SelectedItemSlot moved
+                // 0x44C -> 0x584. Verified against the live TC 7.20 binary: the client writes the
+                // slot to [agent+0x584] and then indexes _items (0x2A8) with a 0x1C stride, e.g.
+                //   mov [rdi+0x584], eax | cdqe | imul rcx, rax, 0x1c | movzx r12d, [rcx+rdi+0x2c0]
+                // 0x44C now lands inside _glamourItems, so the old code fed an item id (~30000+)
+                // to GetInventorySlot as if it were a slot index.
+                var agent = (AgentInspect*)Service.GameGui.FindAgentInterface(addonName).Address;
+                if (agent == null)
+                {
+                    return results;
+                }
 
-                // signature: 89 AB ? ? ? ? E8 ? ? ? ? 48 8B C8 48 8B F8 (offset changes in dt benchmark)
-                var selectedSlot = *(int*)(agent + 0x44C);
+                var selectedSlot = agent->SelectedItemSlot;
+
+                var inventoryManager = InventoryManager.Instance();
+                if (inventoryManager == null)
+                {
+                    return results;
+                }
+
+                var container = inventoryManager->GetInventoryContainer(InventoryType.Examine);
+                if (container == null || container->Items == null || !container->IsLoaded)
+                {
+                    return results;
+                }
+
+                // Both axes: a negative index passes a bare "Size > index" check.
+                if (selectedSlot < 0 || selectedSlot >= container->Size)
+                {
+                    return results;
+                }
 
                 var item = container->GetInventorySlot(selectedSlot);
+                if (item == null)
+                {
+                    return results;
+                }
+
                 itemId = CorrectItemId(item->GetItemId());
                 glamorItemId = CorrectItemId(item->GlamourId);
                 break;
             }
             case "MiragePrismPrismBoxCrystallize":
+            {
+                var uiModule = (UIModule*)Service.GameGui.GetUIModule().Address;
+                if (uiModule == null)
                 {
-                    var uiModule = (UIModule*)Service.GameGui.GetUIModule().Address;
-                    var agents = uiModule->GetAgentModule();
-                    var agent = (AgentMiragePrismPrismBox*)agents->GetAgentByInternalId(AgentId.MiragePrismPrismBox);
-                    itemId = CorrectItemId(agent->Data->TempContextItem.ItemId);
-                    break;
+                    return results;
                 }
+
+                var agents = uiModule->GetAgentModule();
+                if (agents == null)
+                {
+                    return results;
+                }
+
+                var agent = (AgentMiragePrismPrismBox*)agents->GetAgentByInternalId(AgentId.MiragePrismPrismBox);
+                if (agent == null || agent->Data == null)
+                {
+                    return results;
+                }
+
+                itemId = CorrectItemId(agent->Data->TempContextItem.ItemId);
+                break;
+            }
             // TODO: Find itemId offset in AgentInterface, HoveredItem is inaccurate sometimes (maybe?)
             default:
             {
