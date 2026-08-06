@@ -154,32 +154,87 @@ internal class Utilities
                 // hardcoded offset with no version guard. If the game shifts this field, we read
                 // a neighbouring dword and SILENTLY show the wrong vendor -- there is no error to
                 // observe. Re-verify against AgentColorant on every major patch.
+                //
+                // 離線鑑識(台服 7.20 執行檔)已證實 +0x3C 就是染色視窗當前這件裝備的 item id:
+                //   0x140D9DA75: mov esi,[rbx+0x3c]  ->  call 0x1407F40B0 (Item 表取列函式,
+                //   內含 HQ -1000000 / 收藏品 -500000 正規化與上界 0xC031)。
+                // 讀取終點 0x40 遠小於 agent 槽的最小配置 0x80,所以不會越界;真正的風險是
+                // 「靜默顯示錯誤的商人」。
+                //
+                // ⚠️ 這裡**刻意沒有**版面守衛。看起來可用的不變量「+0x3C 會等於 +0x48 或 +0x4C」
+                //    其實會被 0x44 -> 0x3C 的提升路徑打破(0x140D9CD1F 不同步更新 0x48/0x4C),
+                //    拿來當守衛只會製造假警報。所以這裡只留診斷,不擋。
                 var colorantColoringAgent = Service.GameGui.FindAgentInterface(addonName).Address;
                 if (colorantColoringAgent == 0)
                 {
                     return results;
                 }
 
-                itemId = *(uint*)(colorantColoringAgent + 0x3C);
+                // 遊戲存進 +0x3C 的值可以帶著 HQ / 收藏品偏移(取列函式自己會剝),所以這裡
+                // 必須先正規化,否則 HQ / 收藏品的情況會靜默查不到商人。
+                var rawColorantItemId = *(uint*)(colorantColoringAgent + 0x3C);
+                itemId = CorrectItemId(rawColorantItemId);
+
+                // 非 0 卻連 Item 表都查不到 = 我們八成讀到了鄰居的 dword(偏移位移)。
+                // 一併印出鄰居方便下一輪重新定位:+0x44 是「待生效的 item id」,
+                // +0x48 / +0x4C 是分色槽的副本。Information 級 —— 使用者跑 LogLevel 2。
+                if (rawColorantItemId != 0 && !Service.DataManager.GetExcelSheet<Item>().HasRow(itemId))
+                {
+                    Service.PluginLog.Information(
+                        $"ColorantColoring: +0x3C 讀到 {rawColorantItemId} (正規化後 {itemId}),但 Item 表沒有這一列 —— " +
+                        $"寫死偏移可能已位移。鄰居 dword: " +
+                        $"+0x38={*(uint*)(colorantColoringAgent + 0x38)} " +
+                        $"+0x40={*(uint*)(colorantColoringAgent + 0x40)} " +
+                        $"+0x44={*(uint*)(colorantColoringAgent + 0x44)} " +
+                        $"+0x48={*(uint*)(colorantColoringAgent + 0x48)} " +
+                        $"+0x4C={*(uint*)(colorantColoringAgent + 0x4C)}");
+                }
+
                 break;
             }
             case "GrandCompanyExchange":
             case "ShopExchangeItem":
             {
                 // NO NAMED REPLACEMENT: there is no AgentGrandCompanyExchange struct in
-                // FFXIVClientStructs at all, and AgentShop declares nothing at 0x54. Raw offset,
-                // no version guard -- same silent-drift failure mode as ColorantColoring above.
+                // FFXIVClientStructs at all, and AgentShop declares nothing at 0x54. Raw offset.
                 // base sig:
                 //     dt benchmark: 48 8D 4F ? C6 44 24 ? ? 41 83 CF
                 //     6.58: 48 8D 4E ? 44 0F B6 4D
                 // offset sig: 89 73 ?? 44 88 63 (offset is still the same in dt benchmark)
-                var agent = Service.GameGui.FindAgentInterface(addonName).Address;
-                if (agent == 0)
+                //
+                // 離線鑑識(台服 7.20 執行檔)已證實 +0x54 就是 item 右鍵選單當前這一項的
+                // item id(等於內嵌 helper 的 +0x2C);寫入端 0x140AB48D9,消費端把它 % 500000
+                // 之後餵給 GetAgentByInternalId(RecipeNote / GatheringNote)。
+                // 讀取終點 0x58 遠小於 agent 槽的最小配置 0x80,所以不會越界;真正的風險是
+                // 「靜默顯示錯誤的商人」。
+                //
+                // 版面守衛:同一段尾巴的同批寫入(0x140AB48C8 / 0x140AB48D9)裡,helper 會把
+                // agent->AddonId 抄進 +0x50(ushort),關閉選單時清 0。AgentInterface.AddonId 是
+                // FFXIVClientStructs 追蹤中的具名欄位([FieldOffset(0x20)]),所以這是
+                // 「寫死偏移 vs CS 追蹤的欄位」對撞 —— 不是兩個寫死偏移互相背書。
+                // 對不上就 fail-closed:寧可什麼都不顯示,也不要顯示錯的商人。
+                var agentAddress = Service.GameGui.FindAgentInterface(addonName).Address;
+                if (agentAddress == 0)
                 {
                     return results;
                 }
 
-                itemId = *(uint*)(agent + 0x54);
+                var agent = (AgentInterface*)agentAddress;
+                var trackedAddonId = *(ushort*)(agentAddress + 0x50);
+                var expectedAddonId = (ushort)agent->AddonId;
+                if (trackedAddonId != expectedAddonId)
+                {
+                    // Information 級 —— 使用者跑 LogLevel 2,Debug/Verbose 收不到。
+                    Service.PluginLog.Information(
+                        $"{addonName}: 版面守衛不符,略過本次查詢(寧可不顯示也不要顯示錯的商人)。" +
+                        $"+0x50={trackedAddonId} 但 AgentInterface.AddonId={expectedAddonId};" +
+                        $"當下 +0x54={*(uint*)(agentAddress + 0x54)}");
+                    return results;
+                }
+
+                // 遊戲存進 +0x54 的值可以帶著 HQ / 收藏品偏移(消費端自己會剝),所以這裡
+                // 必須先正規化,否則 HQ / 收藏品的情況會靜默查不到商人。
+                itemId = CorrectItemId(*(uint*)(agentAddress + 0x54));
                 break;
             }
             case "ChatLog":
