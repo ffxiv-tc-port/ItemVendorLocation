@@ -56,6 +56,10 @@ internal class HighlightMenus : IDisposable
         var shopAddon = (AtkUnitBase*)shopAddonPtr.Address;
 
         var itemList = (AtkComponentList*)shopAddon->GetComponentByNodeId(16);
+        if (itemList == null)
+        {
+            return;
+        }
 
         var bestMatchIndex = uint.MaxValue;
 
@@ -96,8 +100,19 @@ internal class HighlightMenus : IDisposable
 
         if (bestMatchIndex != uint.MaxValue)
         {
+            // 🔴 這裡是重新取一次,不能靠上面迴圈判過就當作已經守住:
+            // 上面那一輪的判空樣板(66~74 行)在這條分支完全沒有對應,
+            // renderer 或文字節點取不到就會裸解參考 NodeText＝AccessViolation。
             var listItemRenderer = itemList->ItemRendererList[bestMatchIndex].AtkComponentListItemRenderer;
+            if (listItemRenderer == null)
+            {
+                return;
+            }
             var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(3);
+            if (text == null)
+            {
+                return;
+            }
             var itemName = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
             text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
             // strangely, it doesn't seem like the list gets its color updated until we set the text below
