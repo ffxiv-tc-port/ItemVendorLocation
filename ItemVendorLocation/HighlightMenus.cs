@@ -11,6 +11,7 @@ using Lumina.Text.ReadOnly;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace ItemVendorLocation;
@@ -230,58 +231,8 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        foreach (uint index in Enumerable.Range(0, category->List->ListLength))
-        {
-            var listItemRenderer = category->List->ItemRendererList[index].AtkComponentListItemRenderer;
-            if (listItemRenderer == null)
-            {
-                continue;
-            }
-            var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(4);
-            if (text == null)
-            {
-                continue;
-            }
-            var textValue = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
-            try
-            {
-                if (_npcInfo.Any(n => n.ShopName == null ? false : n.ShopName.Split("\n").Any(s => string.Equals(s, textValue))))
-                {
-                    text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-                    break;
-                }
-            }
-            catch (NullReferenceException)
-            {
-                continue;
-            }
-        }
-        foreach (uint index in Enumerable.Range(0, subcategory->List->ListLength))
-        {
-            var listItemRenderer = subcategory->List->ItemRendererList[index].AtkComponentListItemRenderer;
-            if (listItemRenderer == null)
-            {
-                continue;
-            }
-            var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(4);
-            if (text == null)
-            {
-                continue;
-            }
-            var textValue = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
-            try
-            {
-                if (_npcInfo.Any(n => n.ShopName == null ? false : n.ShopName.Split("\n").Any(s => string.Equals(s, textValue))))
-                {
-                    text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-                    break;
-                }
-            }
-            catch (NullReferenceException)
-            {
-                continue;
-            }
-        }
+        HighlightShopNameInDropDownList(category);
+        HighlightShopNameInDropDownList(subcategory);
 
         if (itemList == null)
         {
@@ -311,6 +262,80 @@ internal class HighlightMenus : IDisposable
         }
     }
 
+    /// <summary>
+    /// 把下拉清單裡符合商店名的項目染色（原本 category／subcategory 兩段完全重複的迴圈收斂於此）。
+    /// AtkComponentDropDownList.List 是獨立的指標欄位：元件取得到不代表清單已經建好，
+    /// 為 null 時 -&gt;ListLength／-&gt;ItemRendererList 等同對位址 0 解參考
+    /// （AccessViolation 是 corrupted-state exception，下面那個 try/catch 攔不到）。
+    /// </summary>
+    private unsafe void HighlightShopNameInDropDownList(AtkComponentDropDownList* dropDownList)
+    {
+        if (dropDownList == null)
+        {
+            return;
+        }
+
+        var list = dropDownList->List;
+        if (list == null || list->ItemRendererList == null)
+        {
+            return;
+        }
+
+        foreach (uint index in Enumerable.Range(0, list->ListLength))
+        {
+            var listItemRenderer = list->ItemRendererList[index].AtkComponentListItemRenderer;
+            if (listItemRenderer == null)
+            {
+                continue;
+            }
+            var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(4);
+            if (text == null)
+            {
+                continue;
+            }
+            var textValue = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
+            try
+            {
+                if (_npcInfo.Any(n => n.ShopName == null ? false : n.ShopName.Split("\n").Any(s => string.Equals(s, textValue))))
+                {
+                    text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                    break;
+                }
+            }
+            catch (NullReferenceException)
+            {
+                continue;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 把分頁節點的文字染成指定顏色。
+    /// 分頁節點本身、單選按鈕元件、id 2 的文字節點三層都可能取不到，
+    /// 原本是一路 -&gt; 串到底，中間任一層為 null 就是 AccessViolation（攔不到）。
+    /// </summary>
+    private static unsafe void HighlightTabText(AtkResNode* tab, Vector4 color)
+    {
+        if (tab == null)
+        {
+            return;
+        }
+
+        var radioButton = tab->GetAsAtkComponentRadioButton();
+        if (radioButton == null)
+        {
+            return;
+        }
+
+        var text = radioButton->GetTextNodeById(2);
+        if (text == null)
+        {
+            return;
+        }
+
+        text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(color);
+    }
+
     private unsafe void HighlightShopExchangeCurrencyAddon()
     {
         var shopExchangeCurrencyAddonPtr = Service.GameGui.GetAddonByName("ShopExchangeCurrency");
@@ -328,25 +353,27 @@ internal class HighlightMenus : IDisposable
 
         if (tabs != null)
         {
+            // 分頁是一條兄弟節點鏈：ChildNode 可能是 null，PrevSiblingNode 也可能提前到底。
+            // 原本一路串完才判 null，第一跳斷掉時判斷根本來不及執行。
             AtkResNode* othersTab = tabs->ChildNode;
-            AtkResNode* accessoriesTab = othersTab->PrevSiblingNode;
-            AtkResNode* armorTab = accessoriesTab->PrevSiblingNode;
-            AtkResNode* weaponsTab = armorTab->PrevSiblingNode;
-            if (othersTab != null && _itemInfo?.SpecialShopCategory == 4)
+            AtkResNode* accessoriesTab = othersTab != null ? othersTab->PrevSiblingNode : null;
+            AtkResNode* armorTab = accessoriesTab != null ? accessoriesTab->PrevSiblingNode : null;
+            AtkResNode* weaponsTab = armorTab != null ? armorTab->PrevSiblingNode : null;
+            if (_itemInfo?.SpecialShopCategory == 4)
             {
-                othersTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                HighlightTabText(othersTab, Service.Configuration.ShopHighlightColor);
             }
-            if (accessoriesTab != null && _itemInfo?.SpecialShopCategory == 3)
+            if (_itemInfo?.SpecialShopCategory == 3)
             {
-                accessoriesTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                HighlightTabText(accessoriesTab, Service.Configuration.ShopHighlightColor);
             }
-            if (armorTab != null && _itemInfo?.SpecialShopCategory == 2)
+            if (_itemInfo?.SpecialShopCategory == 2)
             {
-                armorTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                HighlightTabText(armorTab, Service.Configuration.ShopHighlightColor);
             }
-            if (weaponsTab != null && _itemInfo?.SpecialShopCategory == 1)
+            if (_itemInfo?.SpecialShopCategory == 1)
             {
-                weaponsTab->GetAsAtkComponentRadioButton()->GetTextNodeById(2)->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                HighlightTabText(weaponsTab, Service.Configuration.ShopHighlightColor);
             }
         }
 
