@@ -57,7 +57,11 @@ internal class HighlightMenus : IDisposable
         var shopAddon = (AtkUnitBase*)shopAddonPtr.Address;
 
         var itemList = (AtkComponentList*)shopAddon->GetComponentByNodeId(16);
-        if (itemList == null)
+        // 🔴 ItemRendererList 是 AtkComponentList 裡一個獨立的指標欄位(偏移 0xF0),
+        // 元件本身取得到不代表清單項目陣列已經配置好。為 null 時 ->ItemRendererList[index]
+        // 就是對位址 0 附近解參考,而 ListLength 這時未必是 0(不能靠迴圈跑 0 次擋掉)。
+        // AccessViolation 是 corrupted-state exception,try/catch 攔不到,只能事前判空。
+        if (itemList == null || itemList->ItemRendererList == null)
         {
             return;
         }
@@ -134,7 +138,8 @@ internal class HighlightMenus : IDisposable
 
         var componentList = selectIconStringAddon->GetComponentListById(3);
 
-        if (componentList == null)
+        // 🔴 同上:元件非 null 不代表 ItemRendererList 陣列已配置,少判這一層就是裸解參考。
+        if (componentList == null || componentList->ItemRendererList == null)
         {
             return;
         }
@@ -179,7 +184,8 @@ internal class HighlightMenus : IDisposable
 
         var componentList = selectIconStringAddon->GetComponentListById(3);
 
-        if (componentList == null)
+        // 🔴 同上:元件非 null 不代表 ItemRendererList 陣列已配置,少判這一層就是裸解參考。
+        if (componentList == null || componentList->ItemRendererList == null)
         {
             return;
         }
