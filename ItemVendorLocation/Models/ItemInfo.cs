@@ -58,7 +58,26 @@ namespace ItemVendorLocation.Models
             }
 
             // filter fc gc vendors
-            var infoProxy = Framework.Instance()->UIModule->GetInfoModule()->GetInfoProxyById(InfoProxyId.FreeCompany);
+            // 🔴 原本是三層裸鏈。Framework.Instance() 是 [StaticAddress(..., isPointer: true)]：
+            //    產生器讀「指標的位址」再解參考一層，遊戲尚未建立單例時回 null。
+            //    （對照：上面第 52 行的 UIState.Instance() 沒有 isPointer，產生器保證不回 null
+            //      ——那種是擲 InvalidOperationException，判空是死碼，所以刻意不動它。）
+            //    UIModule 是 Framework +0x2B68 的裸欄位，GetInfoModule() 也可能回 null。
+            //    裸解參考 null 原生指標是 AVE，屬 corrupted-state exception，try/catch 攔不到。
+            //    取不到就走既有的 infoProxy == null 路徑（不做部隊軍階商人過濾，直接回傳）。
+            var framework = Framework.Instance();
+            if (framework == null || framework->UIModule == null)
+            {
+                return;
+            }
+
+            var infoModule = framework->UIModule->GetInfoModule();
+            if (infoModule == null)
+            {
+                return;
+            }
+
+            var infoProxy = infoModule->GetInfoProxyById(InfoProxyId.FreeCompany);
             if (infoProxy == null)
             {
                 return;

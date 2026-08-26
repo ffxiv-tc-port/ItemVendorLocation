@@ -110,16 +110,59 @@ public class EntryPoint : IDalamudPlugin
             return;
         }
 
-        var textNode = componentNode->GetTextNodeById(2)->GetAsAtkTextNode();
-        var text = textNode->NodeText;
-        if (text.ToString().Contains("Shop Selling Price"))
+        // 🔴 `GetTextNodeById` 與 `GetAsAtkTextNode` 都是 [MemberFunction] 原生呼叫，不是受管理
+        // 轉型：id 2 的文字節點不存在時 GetTextNodeById 回 null，把 null 當 this 交進
+        // GetAsAtkTextNode 就是 AccessViolationException。這裡是每影格 PreDraw 路徑，
+        // 取不到節點就直接跳過這一幀（不寫 log —— 每幀路徑寫 log 會把整份 log 洗掉）。
+        var rawTextNode = componentNode->GetTextNodeById(2);
+        if (rawTextNode == null)
         {
             return;
         }
 
-        var uiModule = (UIModule*)Service.GameGui.GetUIModule().Address;
-        var agents = uiModule->GetAgentModule();
+        // 保留原本的 GetAsAtkTextNode()（它同時是節點型別的檢查，型別不是 Text 時回 null），
+        // 只是不再把它的回傳值裸解參考。
+        var textNode = rawTextNode->GetAsAtkTextNode();
+        if (textNode == null)
+        {
+            return;
+        }
+
+        var text = textNode->NodeText;
+        // 這個判斷是「本外掛已經附加過了嗎」的等冪守衛,不是在比對遊戲的文字——
+        // 附加內容由 Utilities.GetToolTipString 產生,開頭固定是 ShopSellingPriceLabel。
+        // 標籤在地化之後,守衛也必須換成同一個字串,否則每影格都會再附加一次。
+        if (text.ToString().Contains(Utilities.ShopSellingPriceLabel))
+        {
+            return;
+        }
+
+        // 🔴 這條鏈原本三層全裸，而且掛在**每影格**的 PreDraw 上。
+        // `Service.GameGui.GetUIModule()` 是 Dalamud 的服務包裝（UIModulePtr），包的就是
+        // `(nint)UIModule.Instance()` —— **`.Address` 合法為 0**（UIModule.Instance() 內部是
+        // `Framework.Instance() == null ? null : ...`）。把 0 轉型成 UIModule* 再解參考就是
+        // AccessViolationException，而 AVE 是 corrupted-state exception，try/catch 一律攔不到。
+        // 中間每一跳都是獨立的 null 路徑。修法照抄同 repo Utilities.cs 裡已有的正確樣板
+        // （GetItemInfoFromContextMenu 的 "RecipeTree"/"RecipeMaterialList" 分支）。
+        // 每影格路徑：取不到就安靜跳過這一幀，不寫 log。
+        var uiModuleAddress = Service.GameGui.GetUIModule().Address;
+        if (uiModuleAddress == nint.Zero)
+        {
+            return;
+        }
+
+        var agents = ((UIModule*)uiModuleAddress)->GetAgentModule();
+        if (agents == null)
+        {
+            return;
+        }
+
         var agent = (AgentMiragePrismPrismItemDetail*)agents->GetAgentByInternalId(AgentId.MiragePrismPrismItemDetail);
+        if (agent == null)
+        {
+            return;
+        }
+
         var itemId = Utilities.CorrectItemId(agent->ItemId);
         textNode->SetText($"{text}    {Utilities.GetToolTipString(itemId)}");
     }

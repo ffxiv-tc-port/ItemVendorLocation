@@ -70,7 +70,7 @@ public class Tooltips : IDisposable
             Service.PluginLog.Error(ex, "Exception in item tooltip detour");
         }
 
-        return ItemUpdateTooltipHook!.Original(agent, numberArrayData, stringArrayData);
+        return ItemUpdateTooltipHook!.OriginalDisposeSafe(agent, numberArrayData, stringArrayData);
     }
 
     private unsafe void ItemUpdateTooltipDetourInner(NumberArrayData* numberArrayData, StringArrayData* stringArrayData)
