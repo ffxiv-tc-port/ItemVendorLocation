@@ -22,7 +22,7 @@ using ItemInfo = ItemVendorLocation.Models.ItemInfo;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI;
-using Dalamud.Bindings.ImGui;
+using ImGuiNET;
 using Dalamud.Game.Inventory;
 using Dalamud.Game.Inventory.InventoryEventArgTypes;
 
@@ -84,7 +84,7 @@ public class EntryPoint : IDalamudPlugin
 
         _ = Service.CommandManager.AddHandler(_commandName, new(OnCommand)
         {
-            HelpMessage = "Displays the Item Vendor Location config window",
+            HelpMessage = Loc.Localize("CommandHelpMessage", "Displays the Item Vendor Location config window"),
 
         });
     }
@@ -103,7 +103,7 @@ public class EntryPoint : IDalamudPlugin
 
     private static unsafe void OnMiragePrismPrismItemDetailPreDraw(AddonEvent type, AddonArgs args)
     {
-        var addon = (AtkUnitBase*)args.Addon.Address;
+        var addon = (AtkUnitBase*)args.Addon;
         var componentNode = addon->GetComponentByNodeId(16);
         if (componentNode == null)
         {
@@ -117,7 +117,7 @@ public class EntryPoint : IDalamudPlugin
             return;
         }
 
-        var uiModule = (UIModule*)Service.GameGui.GetUIModule().Address;
+        var uiModule = (UIModule*)Service.GameGui.GetUIModule();
         var agents = uiModule->GetAgentModule();
         var agent = (AgentMiragePrismPrismItemDetail*)agents->GetAgentByInternalId(AgentId.MiragePrismPrismItemDetail);
         var itemId = Utilities.CorrectItemId(agent->ItemId);
@@ -144,7 +144,7 @@ public class EntryPoint : IDalamudPlugin
             };
 
             if (isGlamour)
-                menuItem.Name = _buttonName + "(Glamour)";
+                menuItem.Name = _buttonName + Loc.Localize("GlamourSuffix", "(Glamour)");
             else
                 menuItem.Name = _buttonName;
 
@@ -185,10 +185,10 @@ public class EntryPoint : IDalamudPlugin
             switch (items.Count)
             {
                 case 0:
-                    Utilities.OutputChatLine($" No items found for \"{args}\"");
+                    Utilities.OutputChatLine(string.Format(Loc.Localize("NoItemsFound", " No items found for \"{0}\""), args));
                     return;
                 case > 20:
-                    Utilities.OutputChatLine("You may want to refine your search");
+                    Utilities.OutputChatLine(Loc.Localize("RefineSearch", "You may want to refine your search"));
                     break;
             }
 
@@ -197,10 +197,10 @@ public class EntryPoint : IDalamudPlugin
             {
                 if (results == Service.Configuration.MaxSearchResults)
                 {
-                    Utilities.OutputChatLine($"Displayed {Service.Configuration.MaxSearchResults}/{items.Count} matches.");
+                    Utilities.OutputChatLine(string.Format(Loc.Localize("DisplayedMatches", "Displayed {0}/{1} matches."), Service.Configuration.MaxSearchResults, items.Count));
                     if (items.Count > Service.Configuration.MaxSearchResults)
                     {
-                        Utilities.OutputChatLine("You may want to be more specific.");
+                        Utilities.OutputChatLine(Loc.Localize("BeMoreSpecific", "You may want to be more specific."));
                     }
 
                     break;
@@ -218,7 +218,7 @@ public class EntryPoint : IDalamudPlugin
 
             if (results == 0)
             {
-                Utilities.OutputChatLine($"No vendors found for \"{args}\"");
+                Utilities.OutputChatLine(string.Format(Loc.Localize("NoVendorsFound", "No vendors found for \"{0}\""), args));
             }
         });
     }
@@ -275,18 +275,18 @@ public class EntryPoint : IDalamudPlugin
                 // Avoid modification for certain seasonal items with no Shop Selling Price line
                 if (colonIndex != -1)
                 {
-                    itemtooltip[ItemTooltipString.ShopSellingPrice] = string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": Special Vendor");
+                    itemtooltip[ItemTooltipString.ShopSellingPrice] = string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": ", Loc.Localize("SpecialVendor", "Special Vendor"));
                 }
 
                 return;
             case ItemType.FcShop:
                 info = itemInfo.NpcInfos.First();
-                costStr = $"FC Credits x{info.Costs[0].Item1}";
+                costStr = $"{Loc.Localize("FcCredits", "FC Credits")} x{info.Costs[0].Item1}";
                 itemtooltip[ItemTooltipString.ShopSellingPrice] = string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": ", costStr);
                 return;
             case ItemType.CollectableExchange:
                 itemtooltip[ItemTooltipString.ShopSellingPrice] =
-                    string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": Collectables Exchange Reward");
+                    string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": ", Loc.Localize("CollectablesExchangeReward", "Collectables Exchange Reward"));
                 return;
         }
     }
@@ -332,18 +332,18 @@ public class EntryPoint : IDalamudPlugin
         }
         catch (InvalidOperationException)
         {
-            _ = sb.AddText("No NPCs with a location could be found for ");
+            _ = sb.AddText(Loc.Localize("NoNpcLocationFound", "No NPCs with a location could be found for "));
             _ = sb.Append(SeString.CreateItemLink(item.Id, false));
             Utilities.OutputChatLine(sb.BuiltString);
             return;
         }
 
         _ = sb.Append(SeString.CreateItemLink(item.Id, false));
-        _ = sb.AddText(" can be purchased from ");
+        _ = sb.AddText(Loc.Localize("PurchasedFrom", " can be purchased from "));
         _ = sb.AddUiForeground(Service.Configuration.NPCNameChatColor);
         _ = sb.AddText(vendor.Name);
         _ = sb.AddUiForegroundOff();
-        _ = sb.AddText(" at ");
+        _ = sb.AddText(Loc.Localize("PurchasedAt", " at "));
         _ = sb.Append(SeString.CreateMapLink(vendor.Location.TerritoryType, vendor.Location.MapId, vendor.Location.MapX, vendor.Location.MapY));
         Utilities.OutputChatLine(sb.BuiltString);
         Service.HighlightObject.SetNpcInfo([.. item.NpcInfos]);

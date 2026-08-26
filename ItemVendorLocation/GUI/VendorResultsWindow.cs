@@ -1,10 +1,11 @@
 ﻿using System.Linq;
+using CheapLoc;
 using Dalamud.Interface.Windowing;
 using ItemVendorLocation.Models;
 using System.Numerics;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.ImGuiNotification;
-using Dalamud.Bindings.ImGui;
+using ImGuiNET;
 
 namespace ItemVendorLocation.GUI;
 
@@ -12,7 +13,7 @@ public class VendorResultsWindow : Window
 {
     private ItemInfo _itemToDisplay;
 
-    public VendorResultsWindow() : base("Item Vendor Location")
+    public VendorResultsWindow() : base(Loc.Localize("VendorResultsWindowTitle", "Item Vendor Location"))
     {
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -41,7 +42,7 @@ public class VendorResultsWindow : Window
         {
             if (location.TerritoryType == 282)
             {
-                ImGui.Text("Player Housing");
+                ImGui.Text(Loc.Localize("PlayerHousing", "Player Housing"));
             }
             else
             {
@@ -67,10 +68,10 @@ public class VendorResultsWindow : Window
                 {
                     if (ImGui.IsMouseReleased(ImGuiMouseButton.Right))
                     {
-                        ImGui.SetClipboardText($"{_itemToDisplay.Name} -> {npcInfo.Name}@{placeString}, costs {costStr}");
+                        ImGui.SetClipboardText(string.Format(Loc.Localize("ClipboardFormat", "{0} -> {1}@{2}, costs {3}"), _itemToDisplay.Name, npcInfo.Name, placeString, costStr));
                         Service.NotificationManager.AddNotification(new()
                         {
-                            Content = "Copied vendor info to clipboard",
+                            Content = Loc.Localize("CopiedToClipboard", "Copied vendor info to clipboard"),
                             Title = "ItemVendorLocation",
                             Type = NotificationType.Success,
                         });
@@ -80,7 +81,7 @@ public class VendorResultsWindow : Window
         }
         else
         {
-            ImGui.Text("No location");
+            ImGui.Text(Loc.Localize("NoLocation", "No location"));
         }
 
         _ = ImGui.TableNextColumn();
@@ -106,8 +107,8 @@ public class VendorResultsWindow : Window
 
     public override void Draw()
     {
-        ImGui.Text($"{_itemToDisplay.Name} Vendor list:");
-        ImGuiComponents.HelpMarker("You can right-click the button to copy vendor info to clipboard");
+        ImGui.Text($"{_itemToDisplay.Name} {Loc.Localize("VendorListLabel", "Vendor list:")}");
+        ImGuiComponents.HelpMarker(Loc.Localize("RightClickCopyHelp", "You can right-click the button to copy vendor info to clipboard"));
 
         var columnCount = 3;
 #if DEBUG
@@ -131,18 +132,18 @@ public class VendorResultsWindow : Window
 #if DEBUG
         ImGui.TableSetupColumn("NPC ID");
 #endif
-        ImGui.TableSetupColumn("NPC Name");
+        ImGui.TableSetupColumn(Loc.Localize("ColumnNpcName", "NPC Name"));
         if (Service.Configuration.ShowShopName && _itemToDisplay.HasShopNames())
         {
-            ImGui.TableSetupColumn("Shop Name");
+            ImGui.TableSetupColumn(Loc.Localize("ColumnShopName", "Shop Name"));
         }
 
-        ImGui.TableSetupColumn("Location");
-        ImGui.TableSetupColumn(_itemToDisplay.Type == ItemType.CollectableExchange ? "Exchange Rate" : "Cost");
+        ImGui.TableSetupColumn(Loc.Localize("ColumnLocation", "Location"));
+        ImGui.TableSetupColumn(_itemToDisplay.Type == ItemType.CollectableExchange ? Loc.Localize("ColumnExchangeRate", "Exchange Rate") : Loc.Localize("ColumnCost", "Cost"));
 
         if (_itemToDisplay.Type == ItemType.Achievement)
         {
-            ImGui.TableSetupColumn("Obtain Requirement");
+            ImGui.TableSetupColumn(Loc.Localize("ColumnObtainRequirement", "Obtain Requirement"));
         }
 
         ImGui.TableHeadersRow();
@@ -152,7 +153,7 @@ public class VendorResultsWindow : Window
             string costStr;
             if (_itemToDisplay.Type == ItemType.CollectableExchange)
             {
-                costStr = npcInfo.Costs.Aggregate("", (current, cost) => current + $"{cost.Item2} will yield {cost.Item1}\n");
+                costStr = npcInfo.Costs.Aggregate("", (current, cost) => current + string.Format(Loc.Localize("WillYield", "{0} will yield {1}"), cost.Item2, cost.Item1) + "\n");
             }
             else
             {
