@@ -177,7 +177,7 @@ internal class Utilities
 
                 // 非 0 卻連 Item 表都查不到 = 我們八成讀到了鄰居的 dword(偏移位移)。
                 // 一併印出鄰居方便下一輪重新定位:+0x44 是「待生效的 item id」,
-                // +0x48 / +0x4C 是分色槽的副本。Information 級 —— 使用者跑 LogLevel 2。
+                // +0x48 / +0x4C 是分色槽的副本。Information 級 —— 使用者跑 LogLevel 1。
                 if (rawColorantItemId != 0 && !Service.DataManager.GetExcelSheet<Item>().HasRow(itemId))
                 {
                     Service.PluginLog.Information(
@@ -224,7 +224,7 @@ internal class Utilities
                 var expectedAddonId = (ushort)agent->AddonId;
                 if (trackedAddonId != expectedAddonId)
                 {
-                    // Information 級 —— 使用者跑 LogLevel 2,Debug/Verbose 收不到。
+                    // Information 級 —— 使用者跑 LogLevel 1,盲區只有 Verbose,Debug 收得到但單檔數十萬行會淹沒。
                     Service.PluginLog.Information(
                         $"{addonName}: 版面守衛不符,略過本次查詢(寧可不顯示也不要顯示錯的商人)。" +
                         $"+0x50={trackedAddonId} 但 AgentInterface.AddonId={expectedAddonId};" +
