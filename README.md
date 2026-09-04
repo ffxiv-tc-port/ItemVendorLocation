@@ -1,45 +1,10 @@
 # ItemVendorLocation
-Adds a context menu to find vendor locations for items that can be purchased from a vendor.
-Also adds a chat command that can be used to search for items
-`pvendor` opens the configuration window
-`pvendor ceruleum tank` searches for an item with "ceruleum tank" in the name. This is not case-sensitive and results are limited
-to a maximum of 50.
 
-The plugin provides the following indicators to know if an item is sold by a vendor:
-1. The game indicates the shop selling price without any plugins
+[ItemVendorLocation](https://github.com/electr0sheep/ItemVendorLocation) 的台服移植版，查詢道具的商人購買地點。現由 [Nuko](https://github.com/NukoOoOoOoO) 持續維護。
 
-![Alt text](/Images/GilVendor.png?raw=true "Item Sold for Gil")
+## 功能
 
-2. If the plugin determines an item is sold by a GC vendor, the item's popup will show the price in your GC's currency
-
-![Alt text](/Images/GCVendor.png?raw=true "Item Sold for GC Seals")
-
-3. If the plugin determines an item is sold by other vendors, the item's popup will show that it is sold by Special Vendors
-
-![Alt text](/Images//SpecialVendor.png?raw=true "Item Sold for other currency")
-
-4. If the item is not sold by any vendors, the shop selling price will show None
-
-![Alt text](/Images/NoVendors.png?raw=true "Item not sold for any currency")
-
-If the item is sold by a vendor, a new option will be added to the item's context menu. When clicked, this option can display
-results in one of two possible formats.
-
-![Alt text](/Images/ContextMenu.png?raw=true "Item Context Menu")
-
-1. The plugin will show a list of all possible vendors in a plugin GUI window
-
-![Alt text](/Images/VendorLocations.png?raw=true "Vendor Locations")
-
-2. It can simply find the first vendor and link the coordinates in the in-game chat
-
-![Alt text](/Images/ChatVendorLocation.png?raw=true "Vendor Location")
-
-In addition, there is a chat command that can be used i.e. `/pvendor bronze chaser hammer`
-
-# Contributors
-I appreciate everyone who has contributed, visible over there to the right.
-
-It would be remiss of me to not give special mention to [Nuko](https://github.com/NukoOoOoOoO) for a near complete rewrite.
-They reworked the plugin to completly remove Garland Tools as the data source. This must have taken a ton of work, and is
-much appreciated! In addition to this, Nuko continues to maintain and add features to the plugin regularly. Thanks a ton Nuko!
+- **道具視窗販售方式標示**：一般金幣商店價格、軍隊代幣兌換價格、特殊商人（非金幣/軍隊代幣），或標示「無」代表無商人販售
+- **右鍵選單**：道具新增「商人位置」選項，可彈出視窗列出所有商人，或直接在聊天欄印出第一個商人的座標連結
+- **指令**：`/pvendor <關鍵字>` 依名稱搜尋道具的販售商人（最多顯示 50 筆結果）；`/pvendor` 不帶參數開啟設定視窗
+- **篩選與顯示設定**：篩選重複地點、只顯示所屬軍隊的商人、篩選無地點資訊的結果、顯示商店資訊、醒目提示所選 NPC 與選單項目、自訂顏色、最大搜尋結果數、結果顯示方式（彈出視窗/聊天欄）
