@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud;
+using Lumina.Excel;
 
 namespace ItemVendorLocation;
 #if DEBUG
@@ -88,6 +89,44 @@ public partial class ItemLookup
 #pragma warning restore format
     }
 
+    private const string MjiSpecialShopSheetName = "custom/007/CtsMjiSpecialShop_00789";
+
+    /// <summary>
+    /// 讀取無人島特殊商店（貿易小員）的對話文字表，回傳「文字鍵 -> 顯示文字」的對照。
+    /// 讀不到時回傳空字典，呼叫端會退回空字串，行為與修正前相同。
+    /// </summary>
+    private static Dictionary<string, string> LoadMjiSpecialShopNames()
+    {
+        Dictionary<string, string> names = new();
+
+        try
+        {
+            var sheet = Service.DataManager.GetExcelSheet<RawRow>(name: MjiSpecialShopSheetName);
+            foreach (var row in sheet)
+            {
+                var key = row.ReadStringColumn(0).ExtractText();
+                if (string.IsNullOrEmpty(key))
+                {
+                    continue;
+                }
+
+                names[key] = row.ReadStringColumn(1).ExtractText();
+            }
+        }
+        catch (Exception ex)
+        {
+            Service.PluginLog.Information(ex, $"讀取 {MjiSpecialShopSheetName} 失敗，無人島特殊商店的商店名會顯示為空白。");
+            return names;
+        }
+
+        if (names.Count == 0)
+        {
+            Service.PluginLog.Information($"{MjiSpecialShopSheetName} 讀到 0 列，無人島特殊商店的商店名會顯示為空白。");
+        }
+
+        return names;
+    }
+
     private bool FixNpcVendorInfo(ENpcBase npcBase, ENpcResident resident)
     {
         switch (npcBase.RowId)
@@ -97,36 +136,12 @@ public partial class ItemLookup
                 // see here (https://github.com/xivapi/ffxiv-datamining/commit/fd1e8189682d52ee239b9037815a54d54b17a7bc#diff-983b68d9961598b3f0a8cecfc05d0f76f93afd0fd31b6a0cfea188ec12a729a1)
                 // who knows if they will do it again when they add new stuffs to sanctuary -- nuko
 
-                //var rawExcel = Service.DataManager.GameData.Excel.GetRawSheet("custom/007/CtsMjiSpecialShop_00789");
+                // 上游原本硬寫一張「列號 -> 文字鍵」的對照表，但 GetNameFromKey() 傳進來的是文字鍵
+                // 本身，TryGetValue 永遠 miss ⇒ 無人島特殊商店那 7 筆的商店名恆為空字串。
+                // custom/007/CtsMjiSpecialShop_00789 用 RawRow 讀得到（第 0 欄＝文字鍵、第 1 欄＝
+                // 當前語言的顯示文字），照原作者註解裡的原意改成在執行期讀出來。
+                var mjiSpecialShopNames = LoadMjiSpecialShopNames();
 
-                // can't figure out how to read data from custom/007/CtsMjiSpecialShop_00789, so I'm just gonna recreate it!
-                Dictionary<string, string> mjiSpecialShopNames = new()
-                {
-                    { "0",  "TEXT_CTSMJISPECIALSHOP_00789_TALK_ACTOR" },
-                    { "1",  "TEXT_CTSMJISPECIALSHOP_00789_SYSTEM_000_000" },
-                    { "2",  "TEXT_CTSMJISPECIALSHOP_00789_SYSTEM_000_005" },
-                    { "3",  "TEXT_CTSMJISPECIALSHOP_00789_Q1_000_000" },
-                    { "4",  "TEXT_CTSMJISPECIALSHOP_00789_Q1_000_005" },
-                    { "5",  "TEXT_CTSMJISPECIALSHOP_00789_Q1_000_010" },
-                    { "6",  "TEXT_CTSMJISPECIALSHOP_00789_Q1_000_015" },
-                    { "7",  "TEXT_CTSMJISPECIALSHOP_00789_Q1_000_020" },
-                    { "8",  "TEXT_CTSMJISPECIALSHOP_00789_Q1_000_025" },
-                    { "9",  "TEXT_CTSMJISPECIALSHOP_00789_Q1_000_030" },
-                    { "10", "TEXT_CTSMJISPECIALSHOP_00789_Q2_000_000" },
-                    { "11", "TEXT_CTSMJISPECIALSHOP_00789_Q2_000_005" },
-                    { "12", "TEXT_CTSMJISPECIALSHOP_00789_Q2_000_010" },
-                    { "13", "TEXT_CTSMJISPECIALSHOP_00789_Q2_000_015" },
-                    { "14", "TEXT_CTSMJISPECIALSHOP_00789_OMISE_100_000" },
-                    { "15", "TEXT_CTSMJISPECIALSHOP_00789_SYSTEM_100_000" },
-                    { "16", "TEXT_CTSMJISPECIALSHOP_00789_OMISE_200_000" },
-                };
-
-                //foreach (var parser in rawExcel.GetRowParsers())
-                //{
-                //    var key = parser.ReadColumn<string>(0);
-                //    var name = parser.ReadColumn<string>(1);
-                //    mjiSpecialShopNames[key] = name;
-                //}
 
                 AddSpecialItem(_specialShops.GetRow(1770601), npcBase, resident, ItemType.SpecialShop,
                                $"{GetNameFromKey("TEXT_CTSMJISPECIALSHOP_00789_Q1_000_000")}\n{GetNameFromKey("TEXT_CTSMJISPECIALSHOP_00789_Q2_000_000")}");
