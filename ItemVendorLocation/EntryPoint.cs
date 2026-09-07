@@ -10,6 +10,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using ItemVendorLocation.Models;
 using Lumina.Excel;
 using Lumina.Excel.Sheets;
+using ItemVendorLocation.IPC;
 using ItemVendorLocation.XIVCommon;
 using ItemVendorLocation.XIVCommon.Functions.Tooltips;
 using System.Threading.Tasks;
@@ -56,6 +57,7 @@ public class EntryPoint : IDalamudPlugin
         Service.ChatTwoIpc = new(pi);
         Service.ChatTwoIpc.Enable();
         Service.ItemVendorLocationIpc = new();
+        Service.LifestreamIpc = new();
 
         _xivCommon = new();
         Service.HighlightObject = new();

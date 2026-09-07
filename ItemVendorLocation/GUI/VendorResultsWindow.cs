@@ -6,12 +6,22 @@ using System.Numerics;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Bindings.ImGui;
+using ItemVendorLocation.IPC;
 
 namespace ItemVendorLocation.GUI;
 
 public class VendorResultsWindow : Window
 {
     private ItemInfo _itemToDisplay;
+
+    /// <summary>
+    /// 這一畫格 Lifestream 的狀態。
+    /// </summary>
+    /// <remarks>
+    /// 🔑 每一畫格在 <see cref="Draw"/> 開頭問一次、整張表共用——問狀態是一次跨外掛呼叫，
+    /// 逐列去問等於「列數 × 幀率」次 IPC。
+    /// </remarks>
+    private LifestreamStatus _lifestreamStatus = LifestreamStatus.NotInstalled;
 
     public VendorResultsWindow() : base(Loc.Localize("VendorResultsWindowTitle", "Item Vendor Location"))
     {
@@ -77,6 +87,9 @@ public class VendorResultsWindow : Window
                         });
                     }
                 }
+
+                ImGui.SameLine();
+                DrawTravelButton(npcInfo, location);
             }
         }
         else
@@ -95,6 +108,83 @@ public class VendorResultsWindow : Window
         }
     }
 
+    /// <summary>
+    /// 「前往」按鈕：交給 Lifestream 把角色帶到這個商人身邊。
+    /// </summary>
+    /// <remarks>
+    /// 🔴 純手動：只有使用者親手按下去才會呼叫，沒有任何自動或事件驅動的觸發。
+    /// 🔑 四種狀態刻意分開畫，「問不到」不會被摺成「可以按」——列上看得見「不知道」。
+    /// </remarks>
+    private void DrawTravelButton(NpcInfo npcInfo, NpcLocation location)
+    {
+        switch (_lifestreamStatus)
+        {
+            case LifestreamStatus.NotInstalled:
+                ImGui.TextDisabled(Loc.Localize("TravelNeedsLifestream", "Needs Lifestream"));
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip(Loc.Localize("TravelNeedsLifestreamHelp",
+                                                  "Install and enable Lifestream (and the vnavmesh it needs) to turn this into a travel button."));
+                }
+
+                return;
+
+            case LifestreamStatus.Unknown:
+                ImGui.TextDisabled(Loc.Localize("TravelLifestreamUnknown", "Needs newer Lifestream"));
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip(Loc.Localize("TravelLifestreamUnknownHelp",
+                                                  "Lifestream is installed but did not answer - most likely it is too old to have the endpoint this needs."));
+                }
+
+                return;
+        }
+
+        var busy = _lifestreamStatus == LifestreamStatus.Busy;
+
+        if (busy)
+        {
+            ImGui.BeginDisabled();
+        }
+
+        // 與地點按鈕同樣的理由：同一列可能有兩個商人站在同一點，label 必須帶 npc id 才不會撞 ImGui id。
+        if (ImGui.Button($"{Loc.Localize("TravelButton", "Travel")}###travel{npcInfo.Id}"))
+        {
+            Service.HighlightObject.SetNpcInfo([npcInfo]);
+
+            // 🔴 location.Y 存的是世界座標 Z（NpcLocation 建構時傳的是 level.X / level.Z），
+            //    Lifestream 的第三個參數要的正是世界 Z，不要換成 MapY。
+            var accepted = Service.LifestreamIpc.TryGoToMapPoint(location.TerritoryType, location.X, location.Y,
+                                                                 Service.Configuration.TravelUseFlying);
+
+            if (!accepted)
+            {
+                // 回 false ＝ Lifestream 一件事都沒排。不出聲的話使用者會以為它正在跑。
+                Service.NotificationManager.AddNotification(new()
+                {
+                    Content = Loc.Localize("TravelFailed", "Lifestream did not accept the request - nothing was started."),
+                    Title = "ItemVendorLocation",
+                    Type = NotificationType.Warning,
+                });
+            }
+        }
+
+        if (busy)
+        {
+            ImGui.EndDisabled();
+        }
+
+        // ⚠️ 停用中的項目預設不算 hovered，要帶 AllowWhenDisabled 才問得到，
+        //    否則「為什麼按不下去」這條說明剛好在最需要的時候不會出現。
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+        {
+            ImGui.SetTooltip(busy
+                                 ? Loc.Localize("TravelLifestreamBusy", "Lifestream is busy with another trip - wait for it to finish.")
+                                 : Loc.Localize("TravelButtonHelp",
+                                                "Let Lifestream take you there: it teleports to the nearest aetheryte if needed, then walks (or flies) to the vendor."));
+        }
+    }
+
     public override void PreOpenCheck()
     {
         if (_itemToDisplay != null)
@@ -107,6 +197,9 @@ public class VendorResultsWindow : Window
 
     public override void Draw()
     {
+        // 整張表共用這一次查詢的結果（見 _lifestreamStatus 的說明）。
+        _lifestreamStatus = Service.LifestreamIpc.QueryStatus();
+
         ImGui.Text($"{_itemToDisplay.Name} {Loc.Localize("VendorListLabel", "Vendor list:")}");
         ImGuiComponents.HelpMarker(Loc.Localize("RightClickCopyHelp", "You can right-click the button to copy vendor info to clipboard"));
 

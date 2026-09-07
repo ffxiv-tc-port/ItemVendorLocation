@@ -101,7 +101,17 @@ internal class Localization
             "ColumnLocation": { "message": "地點" },
             "ColumnExchangeRate": { "message": "兌換比例" },
             "ColumnCost": { "message": "花費" },
-            "ColumnObtainRequirement": { "message": "取得條件" }
+            "ColumnObtainRequirement": { "message": "取得條件" },
+            "TravelButton": { "message": "前往" },
+            "TravelButtonHelp": { "message": "交給 Lifestream 帶你過去：跨區會自動傳送到最近的乙太之光，再由 vnavmesh 走（或飛）到商人身邊。" },
+            "TravelNeedsLifestream": { "message": "需要 Lifestream" },
+            "TravelNeedsLifestreamHelp": { "message": "安裝並啟用 Lifestream（以及它需要的 vnavmesh）之後，這裡會變成「前往」按鈕。" },
+            "TravelLifestreamUnknown": { "message": "需要新版 Lifestream" },
+            "TravelLifestreamUnknownHelp": { "message": "已經裝了 Lifestream，但問不到它的狀態——多半是版本太舊、還沒有這個功能需要的端點。" },
+            "TravelLifestreamBusy": { "message": "Lifestream 正在跑別的行程，等它跑完再按。" },
+            "TravelFailed": { "message": "Lifestream 沒有接受這次移動要求，什麼都沒有開始。" },
+            "TravelUseFlying": { "message": "移動時使用飛行坐騎" },
+            "TravelUseFlyingHelp": { "message": "按下商人結果視窗的「前往」時，允許 Lifestream 用飛行坐騎跑最後一段。\n\n不可飛的區域會自己退回用走的。" }
         }
         """;
 }

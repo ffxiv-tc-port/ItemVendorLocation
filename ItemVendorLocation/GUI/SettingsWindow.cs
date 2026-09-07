@@ -222,5 +222,17 @@ Multiple will display the results in a popup window. If you leave it as this the
         }
         ImGui.SameLine();
         ImGuiComponents.HelpMarker(Loc.Localize("ResultsViewTypeModifierHelp", @"Changes the Results View Type when held."));
+
+        var travelUseFlying = Service.Configuration.TravelUseFlying;
+        if (ImGui.Checkbox(Loc.Localize("TravelUseFlying", "Use flying mount when travelling"), ref travelUseFlying))
+        {
+            Service.Configuration.TravelUseFlying = travelUseFlying;
+            Service.Configuration.Save();
+        }
+        ImGui.SameLine();
+        ImGuiComponents.HelpMarker(Loc.Localize("TravelUseFlyingHelp",
+                                                @"Lets Lifestream use a flying mount for the last leg when you press the Travel button in the vendor results window.
+
+Zones you cannot fly in fall back to walking on their own."));
     }
 }
