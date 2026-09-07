@@ -1,4 +1,5 @@
 ﻿using CheapLoc;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
@@ -44,12 +45,57 @@ internal class Utilities
         "Shop",
     };
 
+    /// <summary>還沒送出的聊天訊息。<b>順序就是呼叫順序。</b></summary>
+    private static readonly ConcurrentQueue<SeString> PendingChatLines = new();
+
+    /// <summary>
+    /// 這個外掛唯一的聊天輸出入口（7 個呼叫點全部走這裡）。
+    /// </summary>
+    /// <remarks>
+    /// 🔴🔴 <b>為什麼要排到 framework 執行緒才送出。</b>
+    /// 本 pin 的 Dalamud <c>ChatGui.Print</c> 只是把項目 <c>Enqueue</c> 進一個
+    /// <b>沒有任何同步</b>的 <c>Queue&lt;XivChatEntry&gt;</c>（<c>Dalamud/Game/Gui/ChatGui.cs:43</c>），
+    /// 而 <c>UpdateQueue</c> 在 framework 執行緒上 <c>TryDequeue</c>。從別的執行緒呼叫
+    /// ⇒ 與 framework 執行緒並行改同一個 <c>Queue</c>，
+    /// <b>失敗形式不是「訊息晚一點出現」而是那個佇列本身壞掉</b>。
+    /// <para>
+    /// 🔴 本外掛 7 個呼叫點裡有 5 個直接寫在 <c>EntryPoint.OnCommand</c> 的
+    /// <c>Task.Run</c> 委派內（<c>/pvendor &lt;道具名&gt;</c> 的搜尋結果訊息）＝執行緒池；
+    /// 另外 2 個在 <c>ShowSingleVendor</c> 裡，而它同時被那個 <c>Task.Run</c>
+    /// 與（右鍵選單／ChatTwo 整合的）framework 執行緒路徑呼叫。
+    /// </para>
+    /// <para>
+    /// 📌 <c>IFramework.RunOnFrameworkThread</c> 在<b>已經是</b> framework 執行緒時就地同步執行
+    /// （<c>Framework.cs:167</c>），所以右鍵選單那條路徑的行為一個位元都沒變。
+    /// </para>
+    /// <para>
+    /// 🔑 <b>為什麼還要自己排一個佇列</b>：Dalamud 的 <c>ThreadBoundTaskScheduler</c> 用
+    /// <c>ConcurrentDictionary</c> 存待跑的工作、<c>Run()</c> 走訪它的 <c>Keys</c>
+    /// ⇒ <b>不保證先進先出</b>。把每一次 <c>Print</c> 各自包成一個排程工作的話，
+    /// <c>/pvendor</c> 一次連印好幾行的順序會變成隨機的（例如「顯示 5/37 筆」與
+    /// 「建議縮小搜尋範圍」這兩行會前後顛倒）。改成自己排隊、到了 framework 執行緒
+    /// 一次排乾，順序就與呼叫順序<b>逐字相同</b>。
+    /// </para>
+    /// <para>
+    /// 📌 訊息內容<b>在呼叫端的執行緒上就組好了</b>（前綴與顏色都在進佇列之前完成），
+    /// 排隊的只是「送出」這個動作，所以使用者看到的字一個都沒變。
+    /// 刻意不等它跑完 —— 每個呼叫點都是「印一行就繼續做事」，沒有一處需要印完才能往下走。
+    /// </para>
+    /// </remarks>
     internal static void OutputChatLine(SeString message)
     {
         SeStringBuilder sb = new();
         _ = sb.AddUiForeground("[IVL] ", 45);
         _ = sb.Append(message);
-        Service.ChatGui.Print(sb.BuiltString);
+
+        PendingChatLines.Enqueue(sb.BuiltString);
+        _ = Service.Framework.RunOnFrameworkThread(static () =>
+        {
+            while (PendingChatLines.TryDequeue(out var line))
+            {
+                Service.ChatGui.Print(line);
+            }
+        });
     }
 
     internal static uint CorrectItemId(uint itemId)
