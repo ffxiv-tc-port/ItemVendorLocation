@@ -341,13 +341,21 @@ public class EntryPoint : IDalamudPlugin
         // filteredResults allows us to apply filters without modifying core data,
         // itemInfo is initialized once upon plugin load, so a filter would not
         // be able to be unchecked otherwise
+        //
+        // 🔴 NpcInfos 必須<b>複製</b>而不是共用同一個 List。ApplyFilters() 裡只有
+        //    FilterDuplicates 會重新指派一份新清單，FilterNoLocationNPCs 與 FilterGCResults
+        //    走的是 RemoveAll ——共用參考時，只要「篩選重複項目」沒勾（預設是勾的），
+        //    這兩個篩選就會把 _itemDataMap 裡的核心資料<b>永久刪掉</b>，
+        //    之後把篩選取消勾選也救不回來，正好是上面這段註解說要避免的事。
+        // 🔴 這份複製同時是 IPC 端點 GetItemVendorsWorld 的執行緒安全前提
+        //    （它在呼叫端的執行緒上走訪同一條清單），不要改回共用。
         ItemInfo filteredResults = new()
         {
             AchievementDescription = itemInfo.AchievementDescription,
             Id = itemInfo.Id,
             Name = itemInfo.Name,
             Type = itemInfo.Type,
-            NpcInfos = itemInfo.NpcInfos,
+            NpcInfos = [.. itemInfo.NpcInfos],
             SpecialShopCategory = itemInfo.SpecialShopCategory,
         };
 
