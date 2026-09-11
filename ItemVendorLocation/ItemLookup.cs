@@ -260,6 +260,10 @@ public partial class ItemLookup
                                          new(scriptArgs[4], _items.GetRow(28).Name.ExtractText()),
                                      },
                                      _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null,
+                                     // 🔴 這條路徑是從 CustomTalk 的 script 參數硬讀出來的,
+                                     //    手上只有 CustomTalk 的列號,沒有任何商店表的列可以給。
+                                     //    所以 shopId 刻意留 0(＝「拿不到」),不要拿 CustomTalk 的列號
+                                     //    去充數 —— 消費端會拿它去查 SpecialShop 表,查到的是別人。
                                      ItemType.SpecialShop);
                     continue;
                 }
@@ -442,7 +446,7 @@ public partial class ItemLookup
                 try
                 {
                     var map = _maps.First(i => i.TerritoryType.RowId == sTerritoryType.RowId && i.MapIndex == mapId);
-                    _npcLocations.Add(npcRowId, new(instanceObject.Transform.Translation.X, instanceObject.Transform.Translation.Z, sTerritoryType, map.RowId));
+                    _npcLocations.Add(npcRowId, new(instanceObject.Transform.Translation.X, instanceObject.Transform.Translation.Z, sTerritoryType, map));
                 }
                 catch (InvalidOperationException)
                 {

@@ -151,6 +151,8 @@ public class ItemVendorLocationIpc : IDisposable
                 NpcId = npcInfo.Id,
                 NpcName = npcInfo.Name ?? "",
                 ShopName = npcInfo.ShopName ?? "",
+                ShopId = npcInfo.ShopId,
+                ShopSheetName = npcInfo.ShopSheetName ?? "",
                 SourceType = sourceType,
             };
 

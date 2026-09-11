@@ -28,7 +28,12 @@ public partial class ItemLookup
         _npcLocations[1019101] = new(-36.484375f, 49.240845f, kugane);
 
         // random NPC fixes
-        _ = _npcLocations[1004418] = new(-114.0307f, 118.30322f, _territoryType.GetRow(131), 73);
+        // 🔴 第四個參數本來是 Map 的<列號>,現在要的是整列 —— 那 73 是 Map 的 RowId
+        //    (與 ParseLgbFile 存進去的 map.RowId 同一個值域),不是 MapIndex。
+        _ = _npcLocations[1004418] = new(-114.0307f, 118.30322f, _territoryType.GetRow(131), _maps.GetRowOrDefault(73));
+        // 🔴 刻意用 GetRowOrDefault 不用 GetRow:原本這裡只是傳一個 uint,不碰 Map 表,
+        //    改成傳整列之後 GetRow 查不到會擲例外 —— 而這段跑在建表流程裡,
+        //    擲出去等於整份商人資料建不起來。查不到就回 null,NpcLocation 會退回區域預設地圖。
 
         // some are missing from my test, so we gotta hardcode them
         _ = _npcLocations.TryAdd(1006004, new(5.355835f, 155.22998f, _territoryType.GetRow(128)));

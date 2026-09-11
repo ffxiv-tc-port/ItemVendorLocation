@@ -29,7 +29,8 @@ public partial class ItemLookup
                     achievementDescription = _achievements.Where(i => i.Item.Value.RowId == item.RowId).Select(i => i.Description).First().ExtractText();
                 }
 
-                AddItem_Internal(item.RowId, item.Name.ExtractText(), npcBase.RowId, resident.Singular.ExtractText(), shop, costs, _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null, type, achievementDescription, entry.Category.First().RowId);
+                AddItem_Internal(item.RowId, item.Name.ExtractText(), npcBase.RowId, resident.Singular.ExtractText(), shop, costs, _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null, type, achievementDescription, entry.Category.First().RowId,
+                                 shopId: specialShop.RowId, shopSheetName: ShopSheets.SpecialShop);
             }
         }
     }
@@ -50,7 +51,8 @@ public partial class ItemLookup
                 AddItem_Internal(item.Value.Item.Value.RowId, item.Value.Item.Value.Name.ExtractText(), npcBase.RowId, resident.Singular.ExtractText(),
                                  shop != null ? $"{shop}\n{gilShop.Name}" : gilShop.Name.ExtractText(),
                                  new() { new(item.Value.Item.Value.PriceMid, _gil.Name.ExtractText()) },
-                                 _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null, ItemType.GilShop);
+                                 _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null, ItemType.GilShop,
+                                 shopId: gilShop.RowId, shopSheetName: ShopSheets.GilShop);
             }
             catch (Exception)
             {
@@ -84,7 +86,8 @@ public partial class ItemLookup
 
                     AddItem_Internal(item.Value.Item.Value.RowId, item.Value.Item.Value.Name.ExtractText(), npcBase.RowId, resident.Singular.ExtractText(), null,
                                      new() { new(item.Value.CostGCSeals, seal.Name.ExtractText()) },
-                                     _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null, ItemType.GcShop);
+                                     _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null, ItemType.GcShop,
+                                     shopId: gcId.RowId, shopSheetName: ShopSheets.GcShop);
                 }
                 catch (Exception)
                 {
@@ -139,7 +142,8 @@ public partial class ItemLookup
             var cost = shop.ItemData[i].Cost;
 
             AddItem_Internal(item.Value.RowId, item.Value.Name.ExtractText(), npcBase.RowId, resident.Singular.ExtractText(), null, new() { new(cost, _fccName.Text.ExtractText()) },
-                             _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null, ItemType.FcShop);
+                             _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null, ItemType.FcShop,
+                             shopId: shop.RowId, shopSheetName: ShopSheets.FccShop);
         }
     }
 
@@ -260,7 +264,8 @@ public partial class ItemLookup
                                          new(rewardItem.RewardHigh, $"{exchangeItem.Item.Value.Name} min collectability of {refine.HighCollectability}"),
                                      }, /* Will build cost later*/
                                      _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null,
-                                     ItemType.CollectableExchange /*Yes this is special shop*/);
+                                     ItemType.CollectableExchange /*Yes this is special shop*/,
+                                     shopId: shop.RowId, shopSheetName: ShopSheets.CollectablesShop);
                 }
                 catch
                 {
@@ -305,7 +310,8 @@ public partial class ItemLookup
 
             AddItem_Internal(rewardItem.RowId, rewardItem.Value.Name.ExtractText(), npcBase.RowId, resident.Singular.ExtractText(), "",
                              cost, _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null,
-                             ItemType.QuestReward);
+                             ItemType.QuestReward,
+                             shopId: questReward.RowId, shopSheetName: ShopSheets.QuestClassJobReward);
         }
     }
 
@@ -366,9 +372,17 @@ public partial class ItemLookup
         result.Costs.AddRange(cost);
     }
 
+    /// <param name="shopId">
+    /// 這件東西是從哪一列商店資料掃出來的;<c>0</c> ＝ 拿不到。
+    /// 🔴 各張商店表的列號會互撞,所以一定要配 <paramref name="shopSheetName"/> 一起看。
+    /// </param>
+    /// <param name="shopSheetName">
+    /// <paramref name="shopId"/> 屬於哪一張表,值域見 <see cref="Models.ShopSheets"/>。
+    /// </param>
     private void AddItem_Internal(uint itemId, string itemName, uint npcId, string npcName, string? shopName, List<Tuple<uint, string>> cost, NpcLocation npcLocation,
                                   ItemType type,
-                                  string achievementDesc = "", uint categoryId = 0)
+                                  string achievementDesc = "", uint categoryId = 0,
+                                  uint shopId = 0, string? shopSheetName = null)
     {
         if (itemId == 0 || Dictionaries.KnownNonVendorNpcIds.Contains(npcId))
         {
@@ -384,7 +398,7 @@ public partial class ItemLookup
             {
                 Id = itemId,
                 Name = itemName,
-                NpcInfos = new() { new() { Id = npcId, Location = npcLocation, Costs = cost, Name = npcName, ShopName = shopName } },
+                NpcInfos = new() { new() { Id = npcId, Location = npcLocation, Costs = cost, Name = npcName, ShopName = shopName, ShopId = shopId, ShopSheetName = shopSheetName } },
                 Type = type,
                 AchievementDescription = achievementDesc,
                 SpecialShopCategory = categoryId,
@@ -398,7 +412,7 @@ public partial class ItemLookup
             {
                 Id = itemId,
                 Name = itemName,
-                NpcInfos = new() { new() { Id = npcId, Location = npcLocation, Costs = cost, Name = npcName, ShopName = shopName } },
+                NpcInfos = new() { new() { Id = npcId, Location = npcLocation, Costs = cost, Name = npcName, ShopName = shopName, ShopId = shopId, ShopSheetName = shopSheetName } },
                 Type = type,
                 AchievementDescription = achievementDesc,
                 SpecialShopCategory = categoryId,
@@ -413,7 +427,7 @@ public partial class ItemLookup
 
         if (itemInfo.NpcInfos.Find(j => j.Id == npcId) == null)
         {
-            itemInfo.NpcInfos.Add(new() { Id = npcId, Location = npcLocation, Name = npcName, Costs = cost, ShopName = shopName });
+            itemInfo.NpcInfos.Add(new() { Id = npcId, Location = npcLocation, Name = npcName, Costs = cost, ShopName = shopName, ShopId = shopId, ShopSheetName = shopSheetName });
         }
     }
 }

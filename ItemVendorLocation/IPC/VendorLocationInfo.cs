@@ -29,6 +29,33 @@ public class VendorLocationInfo
     public string ShopName { get; set; } = "";
 
     /// <summary>
+    /// 這件東西所屬商店資料的列號；<c>0</c> 代表建表時拿不到。
+    /// </summary>
+    /// <remarks>
+    /// 🔴 <b>單看這個數字沒有意義</b>——各張商店表的列號互相會撞，
+    /// 一定要配 <see cref="ShopSheetName"/> 才知道是哪一張表的第幾列。
+    ///
+    /// ⚠️ 同一個商人可能透過好幾家店賣同一件東西，這裡給的是
+    /// <b>建表時第一個掃到的那家</b>，不是全部。要「精確到店」可以用它，
+    /// 但不要當成「這個商人賣這件東西的唯一管道」。
+    /// </remarks>
+    public uint ShopId { get; set; }
+
+    /// <summary>
+    /// <see cref="ShopId"/> 是哪一張 Excel 表的列號；拿不到時是空字串。
+    /// </summary>
+    /// <remarks>
+    /// 值域：<c>GilShop</c>／<c>SpecialShop</c>／<c>GCShop</c>／<c>FccShop</c>／
+    /// <c>CollectablesShop</c>／<c>QuestClassJobReward</c>。
+    ///
+    /// 📌 這和 <see cref="SourceType"/> <b>不是同一件事</b>：
+    /// <c>SourceType = Achievement</c> 的那些，商店資料其實在 <c>SpecialShop</c> 表裡，
+    /// 所以這裡會是 <c>SpecialShop</c>。要判斷「取得管道」看 <see cref="SourceType"/>，
+    /// 要拿列號去查表看這一欄。
+    /// </remarks>
+    public string ShopSheetName { get; set; } = "";
+
+    /// <summary>
     /// 取得管道：<c>GilShop</c>／<c>SpecialShop</c>／<c>GcShop</c>／<c>Achievement</c>／
     /// <c>FcShop</c>／<c>QuestReward</c>／<c>CollectableExchange</c> 其中之一。
     /// </summary>
