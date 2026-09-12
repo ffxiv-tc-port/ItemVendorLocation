@@ -158,7 +158,16 @@ internal class HighlightMenus : IDisposable
             }
             try
             {
-                if (_npcInfo.Any(n => n.ShopName == null ? false : n.ShopName.Split("\n").Any(s => string.Equals(s, text->NodeText.ToString()))))
+                // 🔴 兩端剝 SeString 的實作必須是同一套。ShopName 是用 Lumina 的 ExtractText()
+                // 從資料表建出來的（見 ItemLookup.AddItem），而這裡原本是 Utf8String.ToString()
+                // ——那是把原始位元組直接當 UTF-8 解，payload 的 0x02/0x1F/0x01/0x03 會原樣
+                // 留在字串裡 ⇒ 節點文字只要帶一個 payload（連字符、換行、不斷行空格）就恆不
+                // 相等，而且不擲例外、不寫 log，表現就是「這一列從來不會被標色」。
+                // 改成與 HighlightSelectStringAddon / HighlightShopNameInDropDownList 同一套
+                // Lumina 解析；順便照後者把它提到比對外面 —— 原寫法在 Any(n => ... Any(s => ...))
+                // 的內層 lambda 裡，每個 NPC × 每一行店名都要重讀一次原生記憶體。
+                var textValue = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
+                if (_npcInfo.Any(n => n.ShopName == null ? false : n.ShopName.Split("\n").Any(s => string.Equals(s, textValue))))
                 {
                     text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
                     return;
