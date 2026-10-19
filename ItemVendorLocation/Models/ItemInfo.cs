@@ -58,7 +58,23 @@ namespace ItemVendorLocation.Models
             }
 
             // filter fc gc vendors
-            var infoProxy = Framework.Instance()->UIModule->GetInfoModule()->GetInfoProxyById(InfoProxyId.FreeCompany);
+            // 🔴 Framework.Instance() 在遊戲尚未建立單例時回 null；UIModule 與 GetInfoModule() 也各自可能回 null。
+            //    裸解參考 null 原生指標是 try/catch 攔不到的存取違規。
+            //    （上面的 UIState.Instance() 刻意不判空：它解不出位址是擲 InvalidOperationException，不回 null。）
+            //    取不到就走既有的 infoProxy == null 路徑（不做部隊軍階商人過濾，直接回傳）。
+            var framework = Framework.Instance();
+            if (framework == null || framework->UIModule == null)
+            {
+                return;
+            }
+
+            var infoModule = framework->UIModule->GetInfoModule();
+            if (infoModule == null)
+            {
+                return;
+            }
+
+            var infoProxy = infoModule->GetInfoProxyById(InfoProxyId.FreeCompany);
             if (infoProxy == null)
             {
                 return;

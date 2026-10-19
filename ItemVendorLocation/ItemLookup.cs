@@ -176,8 +176,9 @@ public partial class ItemLookup
             return;
         }
 
-        foreach (var npcData in npcBase.ENpcData.Select(x => x.RowId))
+        foreach (var npcDataRef in npcBase.ENpcData)
         {
+            var npcData = npcDataRef.RowId;
             if (npcData == 0)
             {
                 break;
@@ -260,6 +261,10 @@ public partial class ItemLookup
                                          new(scriptArgs[4], _items.GetRow(28).Name.ExtractText()),
                                      },
                                      _npcLocations.TryGetValue(npcBase.RowId, out var value) ? value : null,
+                                     // 🔴 這條路徑是從 CustomTalk 的 script 參數硬讀出來的,
+                                     //    手上只有 CustomTalk 的列號,沒有任何商店表的列可以給。
+                                     //    所以 shopId 刻意留 0(＝「拿不到」),不要拿 CustomTalk 的列號
+                                     //    去充數 —— 消費端會拿它去查 SpecialShop 表,查到的是別人。
                                      ItemType.SpecialShop);
                     continue;
                 }
@@ -363,7 +368,7 @@ public partial class ItemLookup
                 continue;
             }
 
-            var match = npcBase.Value.ENpcData.Any(data => _eventHandlerTypes.Any(i => MatchEventHandlerType(data.RowId, i)));
+            var match = HasKnownEventHandler(npcBase.Value);
 
             if (!match)
             {
@@ -431,7 +436,7 @@ public partial class ItemLookup
                     continue;
                 }
 
-                var match = npcBase.Value.ENpcData.Any(data => _eventHandlerTypes.Any(i => MatchEventHandlerType(data.RowId, i)));
+                var match = HasKnownEventHandler(npcBase.Value);
                 if (!match)
                 {
                     continue;
@@ -439,15 +444,18 @@ public partial class ItemLookup
 
 
                 var mapId = resident.Value.Map;
-                try
+                // 取表中第一張符合的圖（同原本的 First）；找不到就是 null，NpcLocation 退回區域預設地圖。
+                Map? map = null;
+                foreach (var candidate in _maps)
                 {
-                    var map = _maps.First(i => i.TerritoryType.RowId == sTerritoryType.RowId && i.MapIndex == mapId);
-                    _npcLocations.Add(npcRowId, new(instanceObject.Transform.Translation.X, instanceObject.Transform.Translation.Z, sTerritoryType, map.RowId));
+                    if (candidate.TerritoryType.RowId == sTerritoryType.RowId && candidate.MapIndex == mapId)
+                    {
+                        map = candidate;
+                        break;
+                    }
                 }
-                catch (InvalidOperationException)
-                {
-                    _npcLocations.Add(npcRowId, new(instanceObject.Transform.Translation.X, instanceObject.Transform.Translation.Z, sTerritoryType));
-                }
+
+                _npcLocations.Add(npcRowId, new(instanceObject.Transform.Translation.X, instanceObject.Transform.Translation.Z, sTerritoryType, map));
             }
         }
     }
@@ -509,7 +517,7 @@ public partial class ItemLookup
             {
                 continue;
             }
-            var match = npcBase.Value.ENpcData.Any(data => _eventHandlerTypes.Any(i => MatchEventHandlerType(data.RowId, i)));
+            var match = HasKnownEventHandler(npcBase.Value);
 
             if (!match)
             {
@@ -558,6 +566,24 @@ public partial class ItemLookup
     private static bool MatchEventHandlerType(uint data, EventHandlerType type)
     {
         return (data >> 16) == (uint)type;
+    }
+
+    // 同 ENpcData.Any(data => _eventHandlerTypes.Any(i => MatchEventHandlerType(data.RowId, i)))；
+    // 寫成迴圈是因為建表時每個 NPC 的每一格都會走一次，LINQ 版每格新建一個閉包＋委派。
+    private bool HasKnownEventHandler(ENpcBase npcBase)
+    {
+        foreach (var data in npcBase.ENpcData)
+        {
+            foreach (var type in _eventHandlerTypes)
+            {
+                if (MatchEventHandlerType(data.RowId, type))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     // https://github.com/SapphireServer/Sapphire/blob/a5c15f321f7e795ed7362ae15edaada99ca7d9be/src/world/Event/EventHandler.h#L48-L83

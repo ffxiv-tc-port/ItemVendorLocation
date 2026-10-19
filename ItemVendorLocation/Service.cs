@@ -16,6 +16,7 @@ internal class Service
     internal static PluginConfiguration Configuration { get; set; } = null!;
     internal static ChatTwoIPC ChatTwoIpc { get; set; } = null!;
     internal static ItemVendorLocationIpc ItemVendorLocationIpc{ get; set; } = null!;
+    internal static LifestreamIpc LifestreamIpc { get; set; } = null!;
     internal static HighlightObject HighlightObject { get; set; } = null!;
     internal static HighlightMenus HighlightMenus { get; set; } = null!;
 

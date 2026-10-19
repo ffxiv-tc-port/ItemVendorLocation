@@ -64,10 +64,22 @@ internal class ChatTwoIPC
 
     public void Disable()
     {
-        if (!string.IsNullOrEmpty(_id))
-            Unregister.InvokeAction(_id);
-
+        // 先退訂：ChatTwo 已經不在時 Unregister 會擲例外，不能讓兩個訂閱因此留在 CallGate 上釘住舊版本，
+        // 也不能讓例外跳過卸載流程後面的 IPC 端點註銷與 hook 釋放。
+        Available?.Unsubscribe(RegisterIpc);
         Invoke?.Unsubscribe(Integration);
+
+        if (!string.IsNullOrEmpty(_id))
+        {
+            try
+            {
+                Unregister.InvokeAction(_id);
+            }
+            catch (Dalamud.Plugin.Ipc.Exceptions.IpcNotReadyError)
+            {
+                Service.PluginLog.Debug("Chat2 is not available");
+            }
+        }
     }
 
     private void Integration(string id, PlayerPayload? sender, ulong contentId, Payload? payload, SeString? senderString, SeString? content)

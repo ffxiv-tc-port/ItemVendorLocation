@@ -1,6 +1,8 @@
 ﻿using Dalamud.Interface.Windowing;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
+using CheapLoc;
 using Dalamud.Interface.Components;
 using Lumina.Excel.Sheets;
 using System.Linq;
@@ -14,12 +16,40 @@ namespace ItemVendorLocation.GUI;
 
 public class SettingsWindow : Window
 {
-    public SettingsWindow() : base("Item Vendor Location Settings")
+    public SettingsWindow() : base(Loc.Localize("SettingsWindowTitle", "Item Vendor Location Settings"))
     {
         RespectCloseHotkey = true;
 
         SizeCondition = ImGuiCond.FirstUseEver;
         Size = new Vector2(740, 200);
+    }
+
+    // 調色盤是畫在彈出視窗裡的，所以呼叫端拿不到對應的 ImGui item，
+    // IsItemDeactivatedAfterEdit() 在這裡不適用。改成先記錄「顏色已變動」，
+    // 等使用者不再操作任何控制項時才真正寫檔。
+    private bool _shopHighlightColorDirty;
+
+    // UIColor 表在執行中不變，第一次畫設定視窗時建一次。
+    private List<UIColor>? _uiColors;
+
+    private static readonly string[] ResultsViewTypeNames = Enum.GetNames<ResultsViewType>();
+    private static readonly ResultsViewType[] ResultsViewTypeValues = Enum.GetValues<ResultsViewType>();
+    private static readonly string[] HighlightColorNames = Enum.GetNames<ObjectHighlightColor>();
+    private static readonly ObjectHighlightColor[] HighlightColorValues = Enum.GetValues<ObjectHighlightColor>();
+
+    // Dalamud 的有效按鍵清單只算一次、之後不變，所以名稱與值也只建一次。
+    private string[]? _keyNames;
+    private VirtualKey[]? _keyValues;
+
+    // 保底：若在放開滑鼠的同一畫格關窗（例如拖曳中按 Esc），Draw() 不會再跑，
+    // Draw() 裡的延遲存檔就永遠不會觸發，設定會遺失。
+    public override void OnClose()
+    {
+        if (!_shopHighlightColorDirty)
+            return;
+
+        _shopHighlightColorDirty = false;
+        Service.Configuration.Save();
     }
 
     public override void Draw()
@@ -43,88 +73,95 @@ public class SettingsWindow : Window
         }
 #endif
         var filterDuplicates = Service.Configuration.FilterDuplicates;
-        if (ImGui.Checkbox("Filter Duplicates", ref filterDuplicates))
+        if (ImGui.Checkbox(Loc.Localize("FilterDuplicates", "Filter Duplicates"), ref filterDuplicates))
         {
             Service.Configuration.FilterDuplicates = filterDuplicates;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"If checked, will filter duplicate vendors by location");
+        ImGuiComponents.HelpMarker(Loc.Localize("FilterDuplicatesHelp", @"If checked, will filter duplicate vendors by location"));
 
         var filterGCResults = Service.Configuration.FilterGCResults;
-        if (ImGui.Checkbox("Filter GC Results", ref filterGCResults))
+        if (ImGui.Checkbox(Loc.Localize("FilterGCResults", "Filter GC Results"), ref filterGCResults))
         {
             Service.Configuration.FilterGCResults = filterGCResults;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"If checked, will only show your own GC vendor");
+        ImGuiComponents.HelpMarker(Loc.Localize("FilterGCResultsHelp", @"If checked, will only show your own GC vendor"));
 
         var filterNPCsWithNoLocation = Service.Configuration.FilterNPCsWithNoLocation;
-        if (ImGui.Checkbox("Filter Results With No Location", ref filterNPCsWithNoLocation))
+        if (ImGui.Checkbox(Loc.Localize("FilterNoLocation", "Filter Results With No Location"), ref filterNPCsWithNoLocation))
         {
             Service.Configuration.FilterNPCsWithNoLocation = filterNPCsWithNoLocation;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"If checked, will only show npcs with a location");
+        ImGuiComponents.HelpMarker(Loc.Localize("FilterNoLocationHelp", @"If checked, will only show npcs with a location"));
 
         var showShopName = Service.Configuration.ShowShopName;
-        if (ImGui.Checkbox("Show Shop Info", ref showShopName))
+        if (ImGui.Checkbox(Loc.Localize("ShowShopInfo", "Show Shop Info"), ref showShopName))
         {
             Service.Configuration.ShowShopName = showShopName;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"If checked, will show shop name info e.g. 'Purchase Disciple of Magic Gear - Purchase Gear (Lv. 20-29)'");
+        ImGuiComponents.HelpMarker(Loc.Localize("ShowShopInfoHelp", @"If checked, will show shop name info e.g. 'Purchase Disciple of Magic Gear - Purchase Gear (Lv. 20-29)'"));
 
         var highlightSelectedNpc = Service.Configuration.HighlightSelectedNpc;
-        if (ImGui.Checkbox("Highlight selected npc", ref highlightSelectedNpc))
+        if (ImGui.Checkbox(Loc.Localize("HighlightSelectedNpc", "Highlight selected npc"), ref highlightSelectedNpc))
         {
             Service.Configuration.HighlightSelectedNpc = highlightSelectedNpc;
             Service.Framework.Run(() => Service.HighlightObject.ToggleHighlight(highlightSelectedNpc));
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"If checked, will highlight npcs that sell last item searched for once they are visible on-screen");
+        ImGuiComponents.HelpMarker(Loc.Localize("HighlightSelectedNpcHelp", @"If checked, will highlight npcs that sell last item searched for once they are visible on-screen"));
         ImGui.SameLine();
-        var highlightColorNames = Enum.GetNames<ObjectHighlightColor>();
-        var highlightColorValues = Enum.GetValues<ObjectHighlightColor>();
+        var highlightColorNames = HighlightColorNames;
+        var highlightColorValues = HighlightColorValues;
         var selectedHighlightColor = Array.IndexOf(highlightColorValues, Service.Configuration.HighlightColor);
         ImGui.SetNextItemWidth(150f);
-        if (ImGui.Combo("Highlight Color", ref selectedHighlightColor, highlightColorNames, highlightColorNames.Length))
+        if (ImGui.Combo(Loc.Localize("HighlightColor", "Highlight Color"), ref selectedHighlightColor, highlightColorNames, highlightColorNames.Length))
         {
             Service.Configuration.HighlightColor = (ObjectHighlightColor)selectedHighlightColor;
             Service.Configuration.Save();
         }
 
         var highlightMenuSelections = Service.Configuration.HighlightMenuSelections;
-        if (ImGui.Checkbox("Highlight menu selections", ref highlightMenuSelections))
+        if (ImGui.Checkbox(Loc.Localize("HighlightMenuSelections", "Highlight menu selections"), ref highlightMenuSelections))
         {
             Service.Configuration.HighlightMenuSelections = highlightMenuSelections;
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"If checked, will highlight menu selections so items are easier to find.
+        ImGuiComponents.HelpMarker(Loc.Localize("HighlightMenuSelectionsHelp", @"If checked, will highlight menu selections so items are easier to find.
 
 NOTE: If you search for another item that is sold by a vendor whose menu you already have open, this
 will cause both the previous item and the new item to be highlighted. I could fix this, but the only way I
 know how is to redraw every non-highlighted item with the original color. The highlighting occurs every
-frame, and I'm not willing to add another loop per frame for this use case which I think is stupid.");
+frame, and I'm not willing to add another loop per frame for this use case which I think is stupid."));
         ImGui.SameLine();
         // this part seems dumb to me, but it works
         var selectedShopHighlightColor = Service.Configuration.ShopHighlightColor;
         ImGui.SetNextItemWidth(150f);
-        selectedShopHighlightColor = ImGuiComponents.ColorPickerWithPalette(1, "Highlight Color", selectedShopHighlightColor, ImGuiColorEditFlags.NoAlpha);
+        selectedShopHighlightColor = ImGuiComponents.ColorPickerWithPalette(1, Loc.Localize("HighlightColor", "Highlight Color"), selectedShopHighlightColor, ImGuiColorEditFlags.NoAlpha);
         if (selectedShopHighlightColor != Service.Configuration.ShopHighlightColor)
         {
+            // 拖曳色環時每畫格都是新的顏色值，在這裡直接 Save() 等於以幀率同步寫磁碟。
             Service.Configuration.ShopHighlightColor = selectedShopHighlightColor;
+            _shopHighlightColorDirty = true;
+        }
+
+        if (_shopHighlightColorDirty && !ImGui.IsAnyItemActive())
+        {
+            _shopHighlightColorDirty = false;
             Service.Configuration.Save();
         }
 
         ImGui.SetNextItemWidth(200f);
         int maxSearchResults = Service.Configuration.MaxSearchResults;
-        if (ImGui.InputInt("Max Search Results", ref maxSearchResults))
+        if (ImGui.InputInt(Loc.Localize("MaxSearchResults", "Max Search Results"), ref maxSearchResults))
         {
             if (maxSearchResults is <= 50 and >= 1)
             {
@@ -133,31 +170,31 @@ frame, and I'm not willing to add another loop per frame for this use case which
             }
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"The max number of search results when using the text command to prevent chat spam.
+        ImGuiComponents.HelpMarker(Loc.Localize("MaxSearchResultsHelp", @"The max number of search results when using the text command to prevent chat spam.
 
-Max allowable is 50.");
+Max allowable is 50."));
 
-        var resultsViewTypeNames = Enum.GetNames<ResultsViewType>();
-        var resultsViewTypeValues = Enum.GetValues<ResultsViewType>();
+        var resultsViewTypeNames = ResultsViewTypeNames;
+        var resultsViewTypeValues = ResultsViewTypeValues;
         var selectedResultsViewType = Array.IndexOf(resultsViewTypeValues, Service.Configuration.ResultsViewType);
         ImGui.SetNextItemWidth(200f);
-        if (ImGui.Combo("Results View Type", ref selectedResultsViewType, resultsViewTypeNames, resultsViewTypeNames.Length))
+        if (ImGui.Combo(Loc.Localize("ResultsViewType", "Results View Type"), ref selectedResultsViewType, resultsViewTypeNames, resultsViewTypeNames.Length))
         {
             Service.Configuration.ResultsViewType = resultsViewTypeValues[selectedResultsViewType];
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"How the plugin displays vendor location results.
+        ImGuiComponents.HelpMarker(Loc.Localize("ResultsViewTypeHelp", @"How the plugin displays vendor location results.
 
 Single will pick the first result and print it to your chat window.
 
-Multiple will display the results in a popup window. If you leave it as this the plugin will function as it did before with no changes.");
+Multiple will display the results in a popup window. If you leave it as this the plugin will function as it did before with no changes."));
 
-        var uiColors = Service.DataManager.GetExcelSheet<UIColor>().DistinctBy(i => i.ClassicFF).ToList();
+        var uiColors = _uiColors ??= Service.DataManager.GetExcelSheet<UIColor>().DistinctBy(i => i.ClassicFF).ToList();
         int npcNameChatColor = Service.Configuration.NPCNameChatColor;
         ImGui.SetNextItemWidth(200f);
         // my lame way to allow selection of colors as defined in the UIColor sheet
-        if (ImGui.BeginCombo("NPC Name Text Color", ""))
+        if (ImGui.BeginCombo(Loc.Localize("NPCNameTextColor", "NPC Name Text Color"), ""))
         {
             foreach (var color in uiColors)
             {
@@ -183,20 +220,30 @@ Multiple will display the results in a popup window. If you leave it as this the
             ImGui.EndCombo();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"The chat text color of the NPC name when searching via /pvendor.");
+        ImGuiComponents.HelpMarker(Loc.Localize("NPCNameTextColorHelp", @"The chat text color of the NPC name when searching via /pvendor."));
 
-        var keyNames = Service.KeyState.GetValidVirtualKeys().Select(i => i.GetFancyName()).ToArray();
-        keyNames = [.. keyNames.Prepend("None")];
-        var keyValues = Service.KeyState.GetValidVirtualKeys().ToArray();
-        keyValues = [.. keyValues.Prepend(VirtualKey.NO_KEY)];
+        var keyNames = _keyNames ??= [.. Service.KeyState.GetValidVirtualKeys().Select(i => i.GetFancyName()).Prepend("None")];
+        var keyValues = _keyValues ??= [.. Service.KeyState.GetValidVirtualKeys().Prepend(VirtualKey.NO_KEY)];
         var selectedKey = Array.IndexOf(keyValues, Service.Configuration.SearchDisplayModifier);
         ImGui.SetNextItemWidth(200f);
-        if (ImGui.Combo("Results View Type Modifier", ref selectedKey, keyNames, keyNames.Length))
+        if (ImGui.Combo(Loc.Localize("ResultsViewTypeModifier", "Results View Type Modifier"), ref selectedKey, keyNames, keyNames.Length))
         {
             Service.Configuration.SearchDisplayModifier = keyValues[selectedKey];
             Service.Configuration.Save();
         }
         ImGui.SameLine();
-        ImGuiComponents.HelpMarker(@"Changes the Results View Type when held.");
+        ImGuiComponents.HelpMarker(Loc.Localize("ResultsViewTypeModifierHelp", @"Changes the Results View Type when held."));
+
+        var travelUseFlying = Service.Configuration.TravelUseFlying;
+        if (ImGui.Checkbox(Loc.Localize("TravelUseFlying", "Use flying mount when travelling"), ref travelUseFlying))
+        {
+            Service.Configuration.TravelUseFlying = travelUseFlying;
+            Service.Configuration.Save();
+        }
+        ImGui.SameLine();
+        ImGuiComponents.HelpMarker(Loc.Localize("TravelUseFlyingHelp",
+                                                @"Lets Lifestream use a flying mount for the last leg when you press the Travel button in the vendor results window.
+
+Zones you cannot fly in fall back to walking on their own."));
     }
 }

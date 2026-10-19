@@ -10,6 +10,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using ItemVendorLocation.Models;
 using Lumina.Excel;
 using Lumina.Excel.Sheets;
+using ItemVendorLocation.IPC;
 using ItemVendorLocation.XIVCommon;
 using ItemVendorLocation.XIVCommon.Functions.Tooltips;
 using System.Threading.Tasks;
@@ -56,6 +57,7 @@ public class EntryPoint : IDalamudPlugin
         Service.ChatTwoIpc = new(pi);
         Service.ChatTwoIpc.Enable();
         Service.ItemVendorLocationIpc = new();
+        Service.LifestreamIpc = new();
 
         _xivCommon = new();
         Service.HighlightObject = new();
@@ -84,7 +86,7 @@ public class EntryPoint : IDalamudPlugin
 
         _ = Service.CommandManager.AddHandler(_commandName, new(OnCommand)
         {
-            HelpMessage = "Displays the Item Vendor Location config window",
+            HelpMessage = Loc.Localize("CommandHelpMessage", "Displays the Item Vendor Location config window"),
 
         });
     }
@@ -110,16 +112,53 @@ public class EntryPoint : IDalamudPlugin
             return;
         }
 
-        var textNode = componentNode->GetTextNodeById(2)->GetAsAtkTextNode();
-        var text = textNode->NodeText;
-        if (text.ToString().Contains("Shop Selling Price"))
+        // 🔴 `GetTextNodeById` 與 `GetAsAtkTextNode` 都是 [MemberFunction] 原生呼叫，不是受管理
+        // 轉型：id 2 的文字節點不存在時 GetTextNodeById 回 null，把 null 當 this 交進
+        // GetAsAtkTextNode 就是 AccessViolationException。這裡是每影格 PreDraw 路徑，
+        // 取不到節點就直接跳過這一幀（不寫 log —— 每幀路徑寫 log 會把整份 log 洗掉）。
+        var rawTextNode = componentNode->GetTextNodeById(2);
+        if (rawTextNode == null)
         {
             return;
         }
 
-        var uiModule = (UIModule*)Service.GameGui.GetUIModule().Address;
-        var agents = uiModule->GetAgentModule();
+        // GetAsAtkTextNode() 同時是節點型別的檢查：型別不是 Text 時回 null。
+        var textNode = rawTextNode->GetAsAtkTextNode();
+        if (textNode == null)
+        {
+            return;
+        }
+
+        var text = textNode->NodeText;
+        // 這個判斷是「本外掛已經附加過了嗎」的等冪守衛,不是在比對遊戲的文字——
+        // 附加內容由 Utilities.GetToolTipString 產生,開頭固定是 ShopSellingPriceLabel。
+        // 標籤在地化之後,守衛也必須換成同一個字串,否則每影格都會再附加一次。
+        if (text.ToString().Contains(Utilities.ShopSellingPriceLabel))
+        {
+            return;
+        }
+
+        // 🔴 每影格 PreDraw 路徑。`Service.GameGui.GetUIModule()` 的 `.Address` 合法為 0（Framework 尚未建立時），
+        // 把 0 轉型成 UIModule* 再解參考就是 try/catch 攔不到的 AccessViolationException。
+        // 中間每一跳都是獨立的 null 路徑；取不到就安靜跳過這一幀，不寫 log。
+        var uiModuleAddress = Service.GameGui.GetUIModule().Address;
+        if (uiModuleAddress == nint.Zero)
+        {
+            return;
+        }
+
+        var agents = ((UIModule*)uiModuleAddress)->GetAgentModule();
+        if (agents == null)
+        {
+            return;
+        }
+
         var agent = (AgentMiragePrismPrismItemDetail*)agents->GetAgentByInternalId(AgentId.MiragePrismPrismItemDetail);
+        if (agent == null)
+        {
+            return;
+        }
+
         var itemId = Utilities.CorrectItemId(agent->ItemId);
         textNode->SetText($"{text}    {Utilities.GetToolTipString(itemId)}");
     }
@@ -144,7 +183,7 @@ public class EntryPoint : IDalamudPlugin
             };
 
             if (isGlamour)
-                menuItem.Name = _buttonName + "(Glamour)";
+                menuItem.Name = _buttonName + Loc.Localize("GlamourSuffix", "(Glamour)");
             else
                 menuItem.Name = _buttonName;
 
@@ -185,10 +224,10 @@ public class EntryPoint : IDalamudPlugin
             switch (items.Count)
             {
                 case 0:
-                    Utilities.OutputChatLine($" No items found for \"{args}\"");
+                    Utilities.OutputChatLine(string.Format(Loc.Localize("NoItemsFound", " No items found for \"{0}\""), args));
                     return;
                 case > 20:
-                    Utilities.OutputChatLine("You may want to refine your search");
+                    Utilities.OutputChatLine(Loc.Localize("RefineSearch", "You may want to refine your search"));
                     break;
             }
 
@@ -197,10 +236,10 @@ public class EntryPoint : IDalamudPlugin
             {
                 if (results == Service.Configuration.MaxSearchResults)
                 {
-                    Utilities.OutputChatLine($"Displayed {Service.Configuration.MaxSearchResults}/{items.Count} matches.");
+                    Utilities.OutputChatLine(string.Format(Loc.Localize("DisplayedMatches", "Displayed {0}/{1} matches."), Service.Configuration.MaxSearchResults, items.Count));
                     if (items.Count > Service.Configuration.MaxSearchResults)
                     {
-                        Utilities.OutputChatLine("You may want to be more specific.");
+                        Utilities.OutputChatLine(Loc.Localize("BeMoreSpecific", "You may want to be more specific."));
                     }
 
                     break;
@@ -218,7 +257,7 @@ public class EntryPoint : IDalamudPlugin
 
             if (results == 0)
             {
-                Utilities.OutputChatLine($"No vendors found for \"{args}\"");
+                Utilities.OutputChatLine(string.Format(Loc.Localize("NoVendorsFound", "No vendors found for \"{0}\""), args));
             }
         });
     }
@@ -275,18 +314,18 @@ public class EntryPoint : IDalamudPlugin
                 // Avoid modification for certain seasonal items with no Shop Selling Price line
                 if (colonIndex != -1)
                 {
-                    itemtooltip[ItemTooltipString.ShopSellingPrice] = string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": Special Vendor");
+                    itemtooltip[ItemTooltipString.ShopSellingPrice] = string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": ", Loc.Localize("SpecialVendor", "Special Vendor"));
                 }
 
                 return;
             case ItemType.FcShop:
                 info = itemInfo.NpcInfos.First();
-                costStr = $"FC Credits x{info.Costs[0].Item1}";
+                costStr = $"{Loc.Localize("FcCredits", "FC Credits")} x{info.Costs[0].Item1}";
                 itemtooltip[ItemTooltipString.ShopSellingPrice] = string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": ", costStr);
                 return;
             case ItemType.CollectableExchange:
                 itemtooltip[ItemTooltipString.ShopSellingPrice] =
-                    string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": Collectables Exchange Reward");
+                    string.Concat(origStr.TextValue.AsSpan(0, colonIndex), ": ", Loc.Localize("CollectablesExchangeReward", "Collectables Exchange Reward"));
                 return;
         }
     }
@@ -296,13 +335,18 @@ public class EntryPoint : IDalamudPlugin
         // filteredResults allows us to apply filters without modifying core data,
         // itemInfo is initialized once upon plugin load, so a filter would not
         // be able to be unchecked otherwise
+        //
+        // 🔴 NpcInfos 必須<b>複製</b>而不是共用同一個 List：ApplyFilters() 裡 FilterNoLocationNPCs 與 FilterGCResults
+        //    走的是 RemoveAll，共用參考時會把 _itemDataMap 裡的核心資料<b>永久刪掉</b>，取消勾選也救不回來。
+        // 🔴 這份複製同時是 IPC 端點 GetItemVendorsWorld 的執行緒安全前提
+        //    （它在呼叫端的執行緒上走訪同一條清單），不要改回共用。
         ItemInfo filteredResults = new()
         {
             AchievementDescription = itemInfo.AchievementDescription,
             Id = itemInfo.Id,
             Name = itemInfo.Name,
             Type = itemInfo.Type,
-            NpcInfos = itemInfo.NpcInfos,
+            NpcInfos = [.. itemInfo.NpcInfos],
             SpecialShopCategory = itemInfo.SpecialShopCategory,
         };
 
@@ -332,18 +376,18 @@ public class EntryPoint : IDalamudPlugin
         }
         catch (InvalidOperationException)
         {
-            _ = sb.AddText("No NPCs with a location could be found for ");
+            _ = sb.AddText(Loc.Localize("NoNpcLocationFound", "No NPCs with a location could be found for "));
             _ = sb.Append(SeString.CreateItemLink(item.Id, false));
             Utilities.OutputChatLine(sb.BuiltString);
             return;
         }
 
         _ = sb.Append(SeString.CreateItemLink(item.Id, false));
-        _ = sb.AddText(" can be purchased from ");
+        _ = sb.AddText(Loc.Localize("PurchasedFrom", " can be purchased from "));
         _ = sb.AddUiForeground(Service.Configuration.NPCNameChatColor);
         _ = sb.AddText(vendor.Name);
         _ = sb.AddUiForegroundOff();
-        _ = sb.AddText(" at ");
+        _ = sb.AddText(Loc.Localize("PurchasedAt", " at "));
         _ = sb.Append(SeString.CreateMapLink(vendor.Location.TerritoryType, vendor.Location.MapId, vendor.Location.MapX, vendor.Location.MapY));
         Utilities.OutputChatLine(sb.BuiltString);
         Service.HighlightObject.SetNpcInfo([.. item.NpcInfos]);
