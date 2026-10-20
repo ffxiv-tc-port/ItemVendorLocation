@@ -218,9 +218,15 @@ public class VendorResultsWindow : Window
         }
 
         if (!ImGui.BeginChild("VendorListChild"))
+        {
+            ImGui.EndChild();
             return;
+        }
         if (!ImGui.BeginTable("Vendors", columnCount, ImGuiTableFlags.Borders | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, new(-1, -1)))
+        {
+            ImGui.EndChild();
             return;
+        }
         ImGui.TableSetupScrollFreeze(0, 1);
 #if DEBUG
         ImGui.TableSetupColumn("NPC ID");
