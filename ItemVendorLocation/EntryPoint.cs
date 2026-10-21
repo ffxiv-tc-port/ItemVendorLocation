@@ -209,10 +209,14 @@ public class EntryPoint : IDalamudPlugin
 
         _ = Task.Run(() =>
         {
-            if (_items.Any(i => string.Equals(i.Name.ExtractText(), args, StringComparison.OrdinalIgnoreCase)))
+            // 使用者照遊戲畫面打的名字可能是 Singular（台服有 20 列與 Name 不同），兩欄都認。
+            var wanted = ItemNameMatch.Normalize(args);
+            bool IsExactName(Item i) => string.Equals(ItemNameMatch.Normalize(i.Name.ExtractText()), wanted, StringComparison.OrdinalIgnoreCase)
+                                        || string.Equals(ItemNameMatch.Normalize(i.Singular.ExtractText()), wanted, StringComparison.OrdinalIgnoreCase);
+            var exact = wanted.Length == 0 ? [] : _items.Where(IsExactName).ToList();
+            if (exact.Count > 0)
             {
-                foreach (var itemDetails in _items.Where(i => string.Equals(i.Name.ExtractText(), args, StringComparison.OrdinalIgnoreCase))
-                                                  .Select(item => ItemLookup.GetItemInfo(item.RowId)).Where(itemDetails => itemDetails != null))
+                foreach (var itemDetails in exact.Select(item => ItemLookup.GetItemInfo(item.RowId)).Where(itemDetails => itemDetails != null))
                 {
                     ShowSingleVendor(itemDetails!);
                 }
@@ -220,7 +224,8 @@ public class EntryPoint : IDalamudPlugin
                 return;
             }
 
-            var items = _items.Where(i => i.Name.ExtractText().Contains(args, StringComparison.OrdinalIgnoreCase)).ToList();
+            var items = _items.Where(i => i.Name.ExtractText().Contains(args, StringComparison.OrdinalIgnoreCase)
+                                          || i.Singular.ExtractText().Contains(args, StringComparison.OrdinalIgnoreCase)).ToList();
             switch (items.Count)
             {
                 case 0:

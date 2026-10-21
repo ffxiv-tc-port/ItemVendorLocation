@@ -19,6 +19,8 @@ internal class HighlightMenus : IDisposable
 {
     private NpcInfo[] _npcInfo = [];
     private ItemInfo? _itemInfo = null;
+    // 目標道具的比對候選，SetItemInfo 時建好（可能在背景執行緒），每幀只讀。
+    private string[] _itemNames = [];
 
     public HighlightMenus()
     {
@@ -66,7 +68,8 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        var bestMatchIndex = uint.MaxValue;
+        var itemNames = _itemNames;
+        var pick = default(ItemNameMatch.ListPick);
 
         foreach (uint index in Enumerable.Range(0, itemList->ListLength))
         {
@@ -86,25 +89,19 @@ internal class HighlightMenus : IDisposable
             // is foolproof, but it's good enough for now. I'm trying to figure out if I can use the agent for exact name
             // matches, but what I'm seeing doesn't quite match up with what I see in CS. So until I figure that out, I'm
             // going with this.
-            if (string.Equals(_itemInfo.Name, itemName))
+            // 截斷符號在不同語系客戶端可能是三個半形句點或全形省略號,兩種都認（見 ItemNameMatch.TryGetTruncatedHead）。
+            if (pick.Consider(itemNames, (int)index, itemName, allowTruncated: true) == ItemNameMatch.ListPick.Verdict.Exact)
             {
                 // if we ever find an exact match, that must be it, so highlight it and return.
                 text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
                 text->SetText(itemName);
                 return;
             }
-            // 截斷符號在不同語系客戶端可能是三個半形句點或全形省略號,兩種都認。
-            else if (itemName.EndsWith("...") || itemName.EndsWith("…"))
-            {
-                if (_itemInfo.Name.StartsWith(itemName.TrimEnd('.', '…')))
-                {
-                    bestMatchIndex = index;
-                }
-            }
         }
 
-        if (bestMatchIndex != uint.MaxValue)
+        if (pick.Row >= 0)
         {
+            var bestMatchIndex = (uint)pick.Row;
             // 🔴 這裡是重新取一次,不能靠上面迴圈判過就當作已經守住:
             // renderer 或文字節點取不到就會裸解參考 NodeText＝AccessViolation。
             var listItemRenderer = itemList->ItemRendererList[bestMatchIndex].AtkComponentListItemRenderer;
@@ -249,27 +246,61 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
+        HighlightItemInTreeList(itemList, 5, 0);
+    }
+
+    /// <summary>
+    /// 樹狀清單裡把目標道具那一列染色：Singular 整句相等的列優先，否則 Name 整句相等的第一列。
+    /// 文字節點指標只在這一次呼叫內使用。
+    /// </summary>
+    private unsafe void HighlightItemInTreeList(AtkComponentTreeList* itemList, uint textNodeId, uint altTextNodeId)
+    {
+        var itemNames = _itemNames;
+        var pick = default(ItemNameMatch.ListPick);
+        AtkTextNode* fallback = null;
+        var fallbackName = string.Empty;
+        var index = 0;
         foreach (var item in itemList->Items)
         {
+            var row = index++;
             var listItemRenderer = item.Value->Renderer;
             if (listItemRenderer == null)
             {
                 continue;
             }
-            var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(5);
+            var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(textNodeId);
+            if (text == null && altTextNodeId != 0)
+            {
+                text = (AtkTextNode*)listItemRenderer->GetTextNodeById(altTextNodeId);
+            }
             if (text == null)
             {
                 continue;
             }
             var itemName = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
-            if (itemName == _itemInfo?.Name)
+            switch (pick.Consider(itemNames, row, itemName, allowTruncated: false))
             {
-                text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-                // strangely, it doesn't seem like the list gets its color updated until we set the text below
-                text->SetText(itemName);
-                return;
+                case ItemNameMatch.ListPick.Verdict.Exact:
+                    HighlightItemText(text, itemName);
+                    return;
+                case ItemNameMatch.ListPick.Verdict.Fallback:
+                    fallback = text;
+                    fallbackName = itemName;
+                    break;
             }
         }
+
+        if (fallback != null && pick.Row >= 0)
+        {
+            HighlightItemText(fallback, fallbackName);
+        }
+    }
+
+    private static unsafe void HighlightItemText(AtkTextNode* text, string itemName)
+    {
+        text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+        // strangely, it doesn't seem like the list gets its color updated until we set the text below
+        text->SetText(itemName);
     }
 
     /// <summary>
@@ -400,31 +431,7 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        foreach (var item in itemList->Items)
-        {
-            var listItemRenderer = item.Value->Renderer;
-            if (listItemRenderer == null)
-            {
-                continue;
-            }
-            var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(3);
-            if (text == null)
-            {
-                text = (AtkTextNode*)listItemRenderer->GetTextNodeById(8);
-            }
-            if (text == null)
-            {
-                continue;
-            }
-            var itemName = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
-            if (itemName == _itemInfo?.Name)
-            {
-                text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-                // strangely, it doesn't seem like the list gets its color updated until we set the text below
-                text->SetText(itemName);
-                return;
-            }
-        }
+        HighlightItemInTreeList(itemList, 3, 8);
     }
 
     private unsafe void HighlightShopExchangeItemAddon()
@@ -445,27 +452,7 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        foreach (var item in itemList->Items)
-        {
-            var listItemRenderer = item.Value->Renderer;
-            if (listItemRenderer == null)
-            {
-                continue;
-            }
-            var text = (AtkTextNode*)listItemRenderer->GetTextNodeById(7);
-            if (text == null)
-            {
-                continue;
-            }
-            var itemName = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
-            if (itemName == _itemInfo?.Name)
-            {
-                text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-                // strangely, it doesn't seem like the list gets its color updated until we set the text below
-                text->SetText(itemName);
-                return;
-            }
-        }
+        HighlightItemInTreeList(itemList, 7, 0);
     }
 
     private unsafe void HighlightCollectablesShopAddon()
@@ -682,6 +669,7 @@ internal class HighlightMenus : IDisposable
 
     public void SetItemInfo(ItemInfo item)
     {
+        _itemNames = BuildItemNames(item);
         _itemInfo = item;
     }
 
@@ -689,6 +677,16 @@ internal class HighlightMenus : IDisposable
     {
         _npcInfo = [];
         _itemInfo = null;
+        _itemNames = [];
+    }
+
+    // 商店清單顯示的可能是 Singular 也可能是 Name（台服兩欄有 20 列不同），兩個都當候選。
+    private static string[] BuildItemNames(ItemInfo item)
+    {
+        var row = Service.DataManager.GetExcelSheet<Item>().GetRowOrDefault(item.Id);
+        return row is { } r
+            ? ItemNameMatch.Candidates(r.Name.ExtractText(), r.Singular.ExtractText())
+            : ItemNameMatch.Candidates(item.Name, null);
     }
 
     public void Dispose()
