@@ -376,19 +376,31 @@ internal class Utilities
     internal static string ShopSellingPriceLabel =>
         Loc.Localize("ShopSellingPrice", "Shop Selling Price");
 
+    private static NpcInfo? FirstWithCost(List<NpcInfo> npcInfos)
+        => npcInfos.FirstOrDefault(i => i.Costs is { Count: > 0 });
+
+    private static string NoVendorToolTip => $"{ShopSellingPriceLabel}: {Loc.Localize("NoVendor", "None")}";
+
+    /// <remarks>每影格呼叫：商店資料可能沒有 NPC 或價格，這時顯示「無」，不擲例外。</remarks>
     internal static unsafe SeString GetToolTipString(uint itemId)
     {
         var itemInfo = Service.Plugin.ItemLookup.GetItemInfo(Utilities.CorrectItemId(itemId));
 
         if (itemInfo == null)
         {
-            return $"{ShopSellingPriceLabel}: {Loc.Localize("NoVendor", "None")}";
+            return NoVendorToolTip;
         }
 
         switch (itemInfo.Type)
         {
             case ItemType.GilShop:
-                var costStr = itemInfo.NpcInfos[0].Costs[0].Item1.ToString();
+                var info = FirstWithCost(itemInfo.NpcInfos);
+                if (info == null)
+                {
+                    return NoVendorToolTip;
+                }
+
+                var costStr = info.Costs[0].Item1.ToString();
                 return $"{ShopSellingPriceLabel}: {costStr}";
             case ItemType.GcShop:
                 var npcInfos = itemInfo.NpcInfos;
@@ -400,7 +412,11 @@ internal class Utilities
                     _ = npcInfos.RemoveAll(i => otherGcVendorIds.Contains(i.Id));
                 }
 
-                var info = npcInfos.First();
+                info = FirstWithCost(npcInfos);
+                if (info == null)
+                {
+                    return NoVendorToolTip;
+                }
 
                 costStr = $"{info.Costs[0].Item2} x{info.Costs[0].Item1}";
 
@@ -408,7 +424,12 @@ internal class Utilities
             case ItemType.SpecialShop:
                 return $"{ShopSellingPriceLabel}: {Loc.Localize("SpecialVendor", "Special Vendor")}";
             case ItemType.FcShop:
-                info = itemInfo.NpcInfos.First();
+                info = FirstWithCost(itemInfo.NpcInfos);
+                if (info == null)
+                {
+                    return NoVendorToolTip;
+                }
+
                 costStr = $"{Loc.Localize("FcCredits", "FC Credits")} x{info.Costs[0].Item1}";
                 return $"{ShopSellingPriceLabel}: {costStr}";
             case ItemType.CollectableExchange:
