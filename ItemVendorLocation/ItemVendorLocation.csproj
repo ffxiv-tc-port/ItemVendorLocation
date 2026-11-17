@@ -21,7 +21,8 @@
 
 	<ItemGroup>
 		<PackageReference Include="CheapLoc" Version="1.1.8" />
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+		<!-- CheapLoc 會把 Newtonsoft.Json 帶進輸出目錄；只取編譯期參考，執行期用 Dalamud 那份（版本 13.0.3 相同）。 -->
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" ExcludeAssets="runtime" />
 	</ItemGroup>
 
 </Project>
