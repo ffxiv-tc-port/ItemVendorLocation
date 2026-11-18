@@ -21,6 +21,9 @@ internal class HighlightMenus : IDisposable
     private ItemInfo? _itemInfo = null;
     // 目標道具的比對候選，SetItemInfo 時建好（可能在背景執行緒），每幀只讀。
     private string[] _itemNames = [];
+    // 所有商人商店名切好的各段，SetNpcInfo 時建好，每幀只讀（見 ShopNameMatch）。
+    private string[] _shopNameSegments = [];
+    private const int RowTextBufferLength = 256;
 
     public HighlightMenus()
     {
@@ -140,7 +143,14 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        foreach (uint index in Enumerable.Range(0, componentList->ListLength))
+        var segments = _shopNameSegments;
+        if (segments.Length == 0)
+        {
+            return;
+        }
+
+        Span<char> buffer = stackalloc char[RowTextBufferLength];
+        for (var index = 0; index < componentList->ListLength; index++)
         {
             var listItemRenderer = componentList->ItemRendererList[index].AtkComponentListItemRenderer;
             if (listItemRenderer == null)
@@ -152,24 +162,26 @@ internal class HighlightMenus : IDisposable
             {
                 continue;
             }
-            try
+            if (RowMatchesShopName(text, segments, buffer))
             {
-                // 🔴 兩端剝 SeString 的實作必須是同一套：ShopName 是用 Lumina 的 ExtractText() 從資料表建出來的
-                // （見 ItemLookup.AddItem），節點文字若用 Utf8String.ToString() 讀，payload 位元組會原樣留在字串裡
-                // ⇒ 帶一個 payload（連字符、換行、不斷行空格）就恆不相等，而且不擲例外、不寫 log。
-                // 讀文字提到比對外面：放在內層 lambda 裡每個 NPC × 每一行店名都要重讀一次原生記憶體。
-                var textValue = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
-                if (_npcInfo.Any(n => n.ShopName == null ? false : n.ShopName.Split("\n").Any(s => string.Equals(s, textValue))))
-                {
-                    text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-                    return;
-                }
-            }
-            catch (NullReferenceException)
-            {
-                continue;
+                text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                return;
             }
         }
+    }
+
+    /// <summary>
+    /// 列文字（剝法與 Lumina <c>ExtractText()</c> 逐字相同）等於某個商店名段落。
+    /// 🔴 兩端剝 SeString 的實作必須是同一套：ShopName 是 ExtractText() 從資料表建的，改用 Utf8String.ToString()
+    /// 會讓帶 payload（連字符、換行、不斷行空格）的列恆不相等，而且不擲例外、不寫 log。
+    /// </summary>
+    private static unsafe bool RowMatchesShopName(AtkTextNode* text, string[] segments, Span<char> buffer)
+    {
+        var span = (ReadOnlySeStringSpan)text->NodeText.AsSpan();
+        var length = ShopNameMatch.ExtractTextInto(span, buffer);
+        return length >= 0
+            ? ShopNameMatch.Contains(segments, buffer[..length])
+            : ShopNameMatch.Contains(segments, span.ExtractText());
     }
 
     private unsafe void HighlightSelectStringAddon()
@@ -191,7 +203,14 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        foreach (uint index in Enumerable.Range(0, componentList->ListLength))
+        var segments = _shopNameSegments;
+        if (segments.Length == 0)
+        {
+            return;
+        }
+
+        Span<char> buffer = stackalloc char[RowTextBufferLength];
+        for (var index = 0; index < componentList->ListLength; index++)
         {
             var listItemRenderer = componentList->ItemRendererList[index].AtkComponentListItemRenderer;
             if (listItemRenderer == null)
@@ -203,17 +222,10 @@ internal class HighlightMenus : IDisposable
             {
                 continue;
             }
-            try
+            if (RowMatchesShopName(text, segments, buffer))
             {
-                if (_npcInfo.Any(n => n.ShopName == null ? false : n.ShopName.Split("\n").Any(s => string.Equals(s, ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText()))))
-                {
-                    text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-                    return;
-                }
-            }
-            catch (NullReferenceException)
-            {
-                continue;
+                text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                return;
             }
         }
     }
@@ -322,7 +334,14 @@ internal class HighlightMenus : IDisposable
             return;
         }
 
-        foreach (uint index in Enumerable.Range(0, list->ListLength))
+        var segments = _shopNameSegments;
+        if (segments.Length == 0)
+        {
+            return;
+        }
+
+        Span<char> buffer = stackalloc char[RowTextBufferLength];
+        for (var index = 0; index < list->ListLength; index++)
         {
             var listItemRenderer = list->ItemRendererList[index].AtkComponentListItemRenderer;
             if (listItemRenderer == null)
@@ -334,18 +353,10 @@ internal class HighlightMenus : IDisposable
             {
                 continue;
             }
-            var textValue = ((ReadOnlySeStringSpan)text->NodeText.AsSpan()).ExtractText();
-            try
+            if (RowMatchesShopName(text, segments, buffer))
             {
-                if (_npcInfo.Any(n => n.ShopName == null ? false : n.ShopName.Split("\n").Any(s => string.Equals(s, textValue))))
-                {
-                    text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
-                    break;
-                }
-            }
-            catch (NullReferenceException)
-            {
-                continue;
+                text->TextColor = Dalamud.Utility.Numerics.VectorExtensions.ToByteColor(Service.Configuration.ShopHighlightColor);
+                break;
             }
         }
     }
@@ -664,6 +675,7 @@ internal class HighlightMenus : IDisposable
 
     public void SetNpcInfo(NpcInfo[] npcInfos)
     {
+        _shopNameSegments = ShopNameMatch.Segments(npcInfos.Select(n => n?.ShopName));
         _npcInfo = npcInfos;
     }
 
@@ -678,6 +690,7 @@ internal class HighlightMenus : IDisposable
         _npcInfo = [];
         _itemInfo = null;
         _itemNames = [];
+        _shopNameSegments = [];
     }
 
     // 商店清單顯示的可能是 Singular 也可能是 Name（台服兩欄有 20 列不同），兩個都當候選。
