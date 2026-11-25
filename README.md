@@ -4,7 +4,7 @@
 
 ## 功能
 
-- **道具視窗販售方式標示**：一般金幣商店價格、軍票兌換價格、特殊商人（非金幣/軍票），或標示「無」代表無商人販售
+- **道具視窗販售方式標示**：一般 Gil 商店價格、軍票兌換價格、特殊商人（非 Gil/軍票），或標示「無」代表無商人販售
 - **右鍵選單**：道具新增「商人位置」選項，可彈出視窗列出所有商人，或直接在聊天欄印出第一個商人的座標連結
 - **前往商人**：商人結果每列有「前往」按鈕，交給 Lifestream 帶你過去（需要 Lifestream 與 vnavmesh；可設定最後一段用飛行坐騎）
 - **指令**：`/pvendor <關鍵字>` 依名稱搜尋道具的販售商人（最多顯示 50 筆結果）；`/pvendor` 不帶參數開啟設定視窗
@@ -19,8 +19,14 @@
 - 多處降低記憶體用量。
 - 介面繁體中文化。
 
+## 安裝
+
+`/xlsettings` 開「Dalamud 設定」→「試驗性功能」→「第三方插件倉庫」，加入 `https://raw.githubusercontent.com/ffxiv-tc-port/DalamudPluginsTC/main/repo.json` 並啟用、儲存，再到「插件管理員」（`/xlplugins`）安裝；同一個插件只裝這裡的版本，不要同時裝上游版。
+
 ## 需要搭配的插件
 
 - 選用：Lifestream＋vnavmesh（「前往」按鈕）
 
 原作者：[electr0sheep](https://github.com/electr0sheep/ItemVendorLocation)
+
+授權：上游未附授權。
